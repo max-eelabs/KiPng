@@ -40,18 +40,32 @@ def test_file_menu_reload_preserves_settings_and_refreshes_snapshot(app, monkeyp
     preview.show()
     preview.start()
     try:
-        # The File menu is hidden through both loading stages.
+        # Check menu labels on every platform.
         file_menu = preview.menu_bar.file_menu
         assert preview.menu_bar.actions() == [file_menu.menuAction()]
         actions = [action for action in file_menu.actions() if not action.isSeparator()]
-        assert QKeySequence.mnemonic(file_menu.title()).toString() == "Alt+F"
-        assert [QKeySequence.mnemonic(action.text()).toString() for action in actions] == [
-            "Alt+R",
-            "Alt+C",
-            "Alt+L",
-            "Alt+D",
-            "Alt+X",
+        assert file_menu.title() == "&File"
+        assert [action.text() for action in actions] == [
+            "&Render",
+            "&Copy CLI",
+            "Re&load Board",
+            "Reset to &Default",
+            "E&xit",
         ]
+
+        # Qt disables automatic menu mnemonics by default on macOS.
+        if sys.platform != "darwin":
+            labels = [file_menu.title(), *(action.text() for action in actions)]
+            assert [QKeySequence.mnemonic(label).toString() for label in labels] == [
+                "Alt+F",
+                "Alt+R",
+                "Alt+C",
+                "Alt+L",
+                "Alt+D",
+                "Alt+X",
+            ]
+
+        # The File menu is hidden through both loading stages.
         assert preview.menu_bar.isHidden()
         wait_for(lambda: preview.viewer is not None)
         assert preview.menu_bar.isHidden()
