@@ -1,0 +1,5 @@
+- [ ] Add an ability to select background from a fixed set of colors. Background should be white (default), transparent, and then set of mild colors with optional procedural fabric texture (like small grain noise) so it looks expensive
+- [ ] Add 2 draggable controls for adjusting light position which will affect shadow and ray tracing render 
+- [ ] Add Icon for the plugin
+- [ ] Fix dashes change long to short on window headers etc
+- [ ] Add palette rendering option which will disable unrelated controls

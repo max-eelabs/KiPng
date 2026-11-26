@@ -1,14 +1,12 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Camera presets and board colors for the viewport."""
+"""Camera presets and framing guide for the viewport."""
 
 from collections.abc import Callable
 
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
-    QFormLayout,
     QGridLayout,
     QLabel,
     QPushButton,
@@ -16,8 +14,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ....contracts.render import FHD_SIZES, RESOLUTION_SCALES
-from ...viewport.colors import COLOR_SCHEMES
 from ...viewport.pane import FRONT_PITCH, FRONT_YAW, BoardViewport
 
 # Turning both angles by 180 flips to the underside and mirrors the view.
@@ -50,35 +46,6 @@ def create_section(get_viewport: Callable[[], BoardViewport | None]) -> QWidget:
         button.clicked.connect(lambda _checked=False, view=view: apply_view(*view))
         presets.addWidget(button, index // 2, index % 2)
     layout.addLayout(presets)
-
-    def apply_color_scheme(name: str) -> None:
-        viewport = get_viewport()
-        if viewport is not None:
-            viewport.set_color_scheme(COLOR_SCHEMES[name])
-
-    color_scheme = QComboBox()
-    color_scheme.addItems(list(COLOR_SCHEMES))
-    color_scheme.currentTextChanged.connect(apply_color_scheme)
-    options = QFormLayout()
-    options.addRow("Color Scheme", color_scheme)
-
-    resolution = QComboBox()
-    resolution.addItems(list(RESOLUTION_SCALES))
-    aspect_ratio = QComboBox()
-    aspect_ratio.addItems(list(FHD_SIZES))
-
-    def apply_output_size() -> None:
-        viewport = get_viewport()
-        if viewport is not None:
-            scale = RESOLUTION_SCALES[resolution.currentText()]
-            width, height = FHD_SIZES[aspect_ratio.currentText()]
-            viewport.set_output_size((width * scale, height * scale))
-
-    resolution.currentTextChanged.connect(apply_output_size)
-    aspect_ratio.currentTextChanged.connect(apply_output_size)
-    options.addRow("Resolution", resolution)
-    options.addRow("Aspect Ratio", aspect_ratio)
-    layout.addLayout(options)
 
     def show_render_frame(visible: bool) -> None:
         viewport = get_viewport()

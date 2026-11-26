@@ -2,7 +2,7 @@
 
 KiPng adds a **3D Preview** button to the KiCad PCB Editor toolbar. It opens an interactive view of the current board, including unsaved edits, against a white background. Drag to orbit all the way around the board and inspect either side, hold Ctrl and drag to pan, and scroll to zoom. Close the window and click the button again to pick up the latest edits.
 
-In the **Viewport** panel, use **Color Scheme** to preview green, red, white, black, blue, purple, or yellow solder mask. The palette updates both board faces while keeping the current camera. **Render** uses the selected palette in the exported PNG.
+In the **Render** section, use **Color Scheme** to preview green, red, white, black, blue, purple, or yellow solder mask. The palette updates both board faces while keeping the current camera. The exported PNG uses the selected palette.
 
 ## Install locally on Windows
 
@@ -17,9 +17,9 @@ In the **Viewport** panel, use **Color Scheme** to preview green, red, white, bl
 
 The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. The project directory must be writable so the plugin can briefly save a snapshot beside the original board and retain relative model paths. VRML-only footprint models require a matching STEP or IGES file to appear in the GLB.
 
-Choose **FHD** or **4K** and an **Aspect Ratio** below **Color Scheme**. The default is FHD at 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
+In **Render**, choose **Ray Tracing** for KiCad's raytraced lighting or **Viewport** for the Qt 3D preview's appearance. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Ray Tracing at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
 
-Turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Adjust the camera to keep the board inside the frame, then click **Render** and choose a folder. The PNG uses the current camera angle, zoom, and pan. KiCad raytraces the board, and the plugin composites it on white with a soft shadow.
+In the **Viewport** section, turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Adjust the camera to keep the board inside the frame, then click **Render** and choose a folder. The PNG uses the current camera angle, zoom, and pan on a white background with a soft shadow.
 
 ## Project structure
 

@@ -1,7 +1,15 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Supported PNG dimensions by aspect ratio and resolution."""
+"""Render engines and supported PNG dimensions."""
+
+from enum import Enum
+
+
+class RenderEngine(Enum):
+    RAY_TRACING = "Ray Tracing"
+    VIEWPORT = "Viewport"
+
 
 DEFAULT_OUTPUT_SIZE = (1080, 1920)
 FHD_SIZES = {

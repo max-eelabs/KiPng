@@ -4,21 +4,20 @@
 """Save an image from the current viewport camera without blocking the GUI."""
 
 import traceback
+from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QFileDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
-from ...contracts import (
-    BoardSnapshot,
-    ImageRenderer,
-    PreviewCancelled,
-    PreviewError,
-    ViewportCamera,
-)
-from ...contracts.colors import BoardColors
+from ...contracts import BoardSnapshot, ImageRenderer, PreviewCancelled, PreviewError
+from ...contracts.render import RenderEngine
+from ..viewport.pane import BoardViewport
+from ..viewport.render import ViewportCapture, save_viewport_render
 
 
 class RenderControls(QWidget):
@@ -27,6 +26,7 @@ class RenderControls(QWidget):
         self.renderer = renderer
         self.cancelled = cancelled
         self.worker: Thread | None = None
+        self.capture: ViewportCapture | None = None
         self.results: Queue[Path | str] = Queue()
         self.poll = QTimer(self, interval=50)
         self.poll.timeout.connect(self.show_result)
@@ -40,51 +40,80 @@ class RenderControls(QWidget):
         layout.addWidget(self.status)
         layout.addWidget(self.button, alignment=Qt.AlignmentFlag.AlignRight)
 
-    def start(
-        self,
-        snapshot: BoardSnapshot,
-        camera: ViewportCamera,
-        color_scheme: BoardColors,
-        output_size: tuple[int, int],
-    ) -> None:
-        if self.worker is not None or self.cancelled.is_set():
+    def start(self, snapshot: BoardSnapshot, view: BoardViewport) -> None:
+        if self.worker is not None or self.capture is not None or self.cancelled.is_set():
             return
 
+        camera = view.capture_camera()
+        color_scheme = view.color_scheme
+        output_size = view.output_size
+        engine = view.render_engine
         initial_dir = snapshot.project_dir or Path.home()
         destination = QFileDialog.getExistingDirectory(self, "Save rendered PNG", str(initial_dir))
         if not destination or self.cancelled.is_set():
+            return
+        if engine is RenderEngine.VIEWPORT and min(camera.distance, camera.frame_half_width) <= 0:
+            QMessageBox.warning(
+                self,
+                "Render failed",
+                "The board is behind the camera. Pan back to the board and zoom out.",
+            )
             return
 
         self.status.hide()
         self.button.setEnabled(False)
         self.button.setText("Rendering…")
-        self.worker = Thread(
-            target=self.render,
-            args=(snapshot, camera, Path(destination), color_scheme, output_size),
-            name="board-render",
+        output_dir = Path(destination)
+        if engine is RenderEngine.VIEWPORT:
+            self.capture = ViewportCapture(view, camera, color_scheme, output_size)
+            self.capture.captured.connect(
+                lambda frame: self.save_capture(frame, snapshot, output_dir, output_size),
+                Qt.ConnectionType.QueuedConnection,
+            )
+            self.capture.failed.connect(self.capture_failed, Qt.ConnectionType.QueuedConnection)
+            self.capture.start()
+            return
+
+        self.start_worker(
+            partial(
+                self.renderer,
+                snapshot,
+                camera,
+                output_dir,
+                self.cancelled,
+                color_scheme=color_scheme,
+                output_size=output_size,
+            )
         )
+
+    def start_worker(self, render: Callable[[], Path]) -> None:
+        self.worker = Thread(target=self.render, args=(render,), name="board-render")
         self.worker.start()
         self.poll.start()
 
-    def render(
+    def save_capture(
         self,
+        frame: QImage,
         snapshot: BoardSnapshot,
-        camera: ViewportCamera,
         output_dir: Path,
-        color_scheme: BoardColors,
         output_size: tuple[int, int],
     ) -> None:
-        try:
-            self.results.put(
-                self.renderer(
-                    snapshot,
-                    camera,
-                    output_dir,
-                    self.cancelled,
-                    color_scheme=color_scheme,
-                    output_size=output_size,
+        self.release_capture()
+        if not self.cancelled.is_set():
+            self.start_worker(
+                partial(
+                    save_viewport_render, frame, snapshot, output_dir, self.cancelled, output_size
                 )
             )
+
+    def capture_failed(self, message: str) -> None:
+        if self.capture is not None and not self.cancelled.is_set():
+            self.results.put(message)
+            self.show_result()
+
+    def render(self, render: Callable[[], Path]) -> None:
+        try:
+            self.results.put(render())
         except PreviewCancelled:
             pass
         except PreviewError as error:
@@ -111,8 +140,14 @@ class RenderControls(QWidget):
         self.status.setToolTip(str(result))
         self.status.show()
 
+    def release_capture(self) -> None:
+        if self.capture is not None:
+            self.capture.release()
+            self.capture = None
+
     def shutdown(self) -> None:
         self.poll.stop()
+        self.release_capture()
         if self.worker is not None:
             self.worker.join()
             self.worker = None
