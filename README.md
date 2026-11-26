@@ -2,6 +2,8 @@
 
 KiPng adds a **3D Preview** button to the KiCad PCB Editor toolbar. It opens an interactive view of the current board, including unsaved edits, against a white background. Drag to orbit all the way around the board and inspect either side, hold Ctrl and drag to pan, and scroll to zoom. Close the window and click the button again to pick up the latest edits.
 
+In the **Viewport** panel, use **Color Scheme** to preview green, red, white, black, blue, purple, or yellow solder mask. The palette updates both board faces while keeping the current camera. **Render** uses the selected palette in the exported PNG.
+
 ## Install locally on Windows
 
 1. Install KiCad 10.0 with its command-line tools and configure a 64-bit Python 3.10–3.13 interpreter in **Preferences → Plugins**. KiCad installs the dependencies listed in the plugin's `requirements.txt`.

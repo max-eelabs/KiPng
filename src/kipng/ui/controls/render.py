@@ -18,6 +18,7 @@ from ...contracts import (
     PreviewError,
     ViewportCamera,
 )
+from ...contracts.colors import BoardColors
 
 
 class RenderControls(QWidget):
@@ -39,7 +40,9 @@ class RenderControls(QWidget):
         layout.addWidget(self.status)
         layout.addWidget(self.button, alignment=Qt.AlignmentFlag.AlignRight)
 
-    def start(self, snapshot: BoardSnapshot, camera: ViewportCamera) -> None:
+    def start(
+        self, snapshot: BoardSnapshot, camera: ViewportCamera, color_scheme: BoardColors
+    ) -> None:
         if self.worker is not None or self.cancelled.is_set():
             return
 
@@ -52,14 +55,26 @@ class RenderControls(QWidget):
         self.button.setEnabled(False)
         self.button.setText("Rendering…")
         self.worker = Thread(
-            target=self.render, args=(snapshot, camera, Path(destination)), name="board-render"
+            target=self.render,
+            args=(snapshot, camera, Path(destination), color_scheme),
+            name="board-render",
         )
         self.worker.start()
         self.poll.start()
 
-    def render(self, snapshot: BoardSnapshot, camera: ViewportCamera, output_dir: Path) -> None:
+    def render(
+        self,
+        snapshot: BoardSnapshot,
+        camera: ViewportCamera,
+        output_dir: Path,
+        color_scheme: BoardColors,
+    ) -> None:
         try:
-            self.results.put(self.renderer(snapshot, camera, output_dir, self.cancelled))
+            self.results.put(
+                self.renderer(
+                    snapshot, camera, output_dir, self.cancelled, color_scheme=color_scheme
+                )
+            )
         except PreviewCancelled:
             pass
         except PreviewError as error:

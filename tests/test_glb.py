@@ -7,6 +7,7 @@ from copy import deepcopy
 
 import pytest
 
+from kipng.contracts import BOARD_MATERIAL_TAGS
 from kipng.export.glb import prepare_preview_materials
 
 
@@ -50,7 +51,11 @@ def test_preview_materials_keep_geometry_and_unify_copper(tmp_path, write_glb):
     updated = {material["name"]: material for material in scene["materials"]}
 
     # Both PCB copper materials get the same finish.
-    expected_finish = {**board_copper, "roughnessFactor": 0.65}
+    expected_finish = {
+        **board_copper,
+        "baseColorFactor": [0.66, 0.54, 0.30, 1],
+        "roughnessFactor": 0.65,
+    }
     assert updated["board copper"]["pbrMetallicRoughness"] == expected_finish
     assert updated["pad"]["pbrMetallicRoughness"] == expected_finish
 
@@ -69,7 +74,7 @@ def test_preview_materials_keep_geometry_and_unify_copper(tmp_path, write_glb):
     assert list(tmp_path.iterdir()) == [model]
 
 
-def test_preview_lets_copper_show_through_the_default_mask(tmp_path, write_glb):
+def test_preview_tags_both_mask_faces_for_viewport_palettes(tmp_path, write_glb):
     # Give both solder-mask meshes and an unrelated component the same starting opacity.
     names = ["board_soldermask", "board_soldermask", "component"]
     materials = [
@@ -89,17 +94,16 @@ def test_preview_lets_copper_show_through_the_default_mask(tmp_path, write_glb):
     model = tmp_path / "board.glb"
     write_glb(model, materials, meshes)
 
-    # Reduce only the mask opacity, preserving its tint and blend mode.
+    # Mark both mask faces for live recoloring without changing their GLB finishes.
     prepare_preview_materials(model, board_name="board")
     data = model.read_bytes()
     size = struct.unpack_from("<I", data, 12)[0]
     updated = json.loads(data[20 : 20 + size])["materials"]
-    for material in updated[:2]:
-        assert material["alphaMode"] == "BLEND"
-        assert material["pbrMetallicRoughness"]["baseColorFactor"] == [0.08, 0.2, 0.14, 0.77]
+    for original, material in zip(materials[:2], updated[:2], strict=True):
+        assert material == {**original, "alphaCutoff": BOARD_MATERIAL_TAGS["soldermask"]}
     assert updated[2] == materials[2]
 
-    # Applying the same preview adjustment twice keeps the opacity stable.
+    # Preparing an already tagged model leaves its bytes unchanged.
     prepare_preview_materials(model, board_name="board")
     assert model.read_bytes() == data
 

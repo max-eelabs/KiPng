@@ -8,6 +8,12 @@ from pathlib import Path
 from threading import Event
 from typing import Protocol
 
+from .colors import BoardColors
+
+# Qt 6.8's RuntimeLoader drops glTF material names, but retains alphaCutoff.
+# KiCad's opaque and blended board layers ignore this cutoff when rendered.
+BOARD_MATERIAL_TAGS = {"PCB": 1.125, "soldermask": 1.25, "silkscreen": 1.375}
+
 
 class PreviewError(Exception):
     """An actionable error to display in the preview window."""
@@ -52,7 +58,13 @@ class ViewportCamera:
 
 class ImageRenderer(Protocol):
     def __call__(
-        self, snapshot: BoardSnapshot, camera: ViewportCamera, output_dir: Path, cancelled: Event
+        self,
+        snapshot: BoardSnapshot,
+        camera: ViewportCamera,
+        output_dir: Path,
+        cancelled: Event,
+        *,
+        color_scheme: BoardColors,
     ) -> Path:
         """Save a PNG in the selected directory and return its path."""
         ...

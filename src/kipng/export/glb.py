@@ -7,12 +7,16 @@ import json
 import os
 import shutil
 import struct
+from copy import deepcopy
 from math import isclose
 from pathlib import Path
 
+from ..contracts import BOARD_MATERIAL_TAGS
+from ..contracts.colors import PREVIEW_COPPER_RGB
 from .paste import add_paste_surfaces
 
 LED_HOUSING_RGB = (0.778, 0.770, 0.626)
+KICAD_COPPER_RGB = (0.7, 0.61, 0.0)
 
 
 def prepare_preview_materials(
@@ -31,14 +35,8 @@ def prepare_preview_materials(
         ):
             raise ValueError("Expected a GLB 2.0 scene.")
         scene = json.loads(source.read(chunk_length))
-        mask_materials = {
-            primitive["material"]
-            for mesh in scene.get("meshes", [])
-            if mesh.get("name") == f"{board_name}_soldermask"
-            for primitive in mesh["primitives"]
-            if "material" in primitive
-        }
-        changed = adjust_materials(scene.get("materials", []), mask_materials)
+        tagged = tag_board_materials(scene, board_name)
+        changed = adjust_materials(scene.get("materials", []))
         binary_start = source.tell()
         extra = b""
         if paste_plots:
@@ -51,7 +49,7 @@ def prepare_preview_materials(
                 scene["buffers"][0]["byteLength"] = binary_size + len(extra)
             else:
                 source.seek(binary_start)
-        if not changed and not extra:
+        if not tagged and not changed and not extra:
             return
 
         data = json.dumps(scene, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -67,10 +65,48 @@ def prepare_preview_materials(
     updated.replace(model)
 
 
-def adjust_materials(materials: list[dict], mask_materials: set[int]) -> bool:
+def tag_board_materials(scene: dict, board_name: str) -> bool:
+    """Mark KiCad's board layers for live recoloring in Qt Quick 3D."""
+    if not board_name:
+        return False
+
+    tags = {f"{board_name}_{layer}": tag for layer, tag in BOARD_MATERIAL_TAGS.items()}
+    materials = scene.get("materials", [])
+    board_primitives: dict[tuple[int, float], list[dict]] = {}
+    claimed = set()
+    for mesh in scene.get("meshes", []):
+        tag = tags.get(mesh.get("name"))
+        for primitive in mesh["primitives"]:
+            if "material" not in primitive:
+                continue
+            index = primitive["material"]
+            if tag is None:
+                claimed.add(index)
+            else:
+                board_primitives.setdefault((index, tag), []).append(primitive)
+
     changed = False
-    copper_rgb = (0.7, 0.61, 0.0)
-    for index, material in enumerate(materials):
+    for (index, tag), primitives in board_primitives.items():
+        material = materials[index]
+        if material.get("alphaMode") == "MASK":
+            continue
+        # KiCad can reuse one material for meshes with identical finishes.
+        if index in claimed:
+            material = deepcopy(material)
+            for primitive in primitives:
+                primitive["material"] = len(materials)
+            materials.append(material)
+            changed = True
+        claimed.add(index)
+        if material.get("alphaCutoff") != tag:
+            material["alphaCutoff"] = tag
+            changed = True
+    return changed
+
+
+def adjust_materials(materials: list[dict]) -> bool:
+    changed = False
+    for material in materials:
         pbr = material.get("pbrMetallicRoughness")
         if not pbr or "metallicRoughnessTexture" in pbr:
             continue
@@ -78,16 +114,8 @@ def adjust_materials(materials: list[dict], mask_materials: set[int]) -> bool:
         metalness = pbr.get("metallicFactor")
         roughness = pbr.get("roughnessFactor", 1)
         color = pbr.get("baseColorFactor")
-        # Let a little more copper show through KiCad's default mask on both faces.
-        if (
-            index in mask_materials
-            and material.get("alphaMode") == "BLEND"
-            and color
-            and isclose(color[3], 0.83, abs_tol=1e-6)
-        ):
-            color[3] = 0.77
         # Make KiCad's blended silkscreen opaque so it always sits above the solder mask.
-        elif (
+        if (
             metalness == 0
             and isclose(roughness, 0.9, abs_tol=1e-6)
             and color
@@ -95,14 +123,16 @@ def adjust_materials(materials: list[dict], mask_materials: set[int]) -> bool:
         ):
             color[3] = 1
             material["alphaMode"] = "OPAQUE"
-        # KiCad 10 exports board pads in gray and other PCB copper in gold.
+        # Unify KiCad's gray pads and gold copper with a warmer, less saturated
+        # finish that shows through the mask without shifting its hue as much.
         elif (
             metalness == 1
             and color
             and isclose(roughness, 0.4, abs_tol=1e-6)
-            and tuple(round(channel, 3) for channel in color[:3]) in (copper_rgb, (0.5, 0.5, 0.5))
+            and tuple(round(channel, 3) for channel in color[:3])
+            in (KICAD_COPPER_RGB, (0.5, 0.5, 0.5))
         ):
-            color[:3] = copper_rgb
+            color[:3] = PREVIEW_COPPER_RGB
             pbr["roughnessFactor"] = 0.65
         # KiCad's library uses this cream plastic across multiple white LED housings.
         # Match the exported linear RGB so lenses, metal, and painted parts keep their colors.
