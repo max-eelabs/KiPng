@@ -3,9 +3,25 @@
 
 """A full-window loading surface shared by progress and error states."""
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QFrame, QLabel, QPlainTextEdit, QProgressBar, QVBoxLayout, QWidget
+
+LOADER_SIZE = QSize(360, 160)
+PREPARING_BOARD = "Preparing board…"
+
+
+def resize_centered(window: QWidget, size: QSize) -> None:
+    window.resize(size)
+    available = window.screen().availableGeometry()
+    window.move(available.center() - window.rect().center())
+
+
+def show_compact(window: QWidget) -> None:
+    """Return the window to the compact size even when the preview was maximized."""
+    window.setWindowState(Qt.WindowState.WindowNoState)
+    window.setMinimumSize(LOADER_SIZE)
+    resize_centered(window, LOADER_SIZE)
 
 
 class LoadingScreen(QWidget):
@@ -19,7 +35,7 @@ class LoadingScreen(QWidget):
         self.setPalette(palette)
         self.setAutoFillBackground(True)
 
-        self.message = QLabel("Preparing board…")
+        self.message = QLabel(PREPARING_BOARD)
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
         self.message.setTextFormat(Qt.TextFormat.PlainText)
@@ -44,6 +60,12 @@ class LoadingScreen(QWidget):
         layout.addWidget(self.progress, alignment=Qt.AlignmentFlag.AlignHCenter)
         layout.addStretch()
         layout.addWidget(self.error_details, 1)
+
+    def show_progress(self) -> None:
+        self.message.setText(PREPARING_BOARD)
+        self.error_details.hide()
+        self.message.show()
+        self.progress.show()
 
     def show_error(self, message: str) -> None:
         self.message.hide()

@@ -72,8 +72,9 @@ def test_loading_covers_split_until_viewport_is_ready(app, monkeypatch, tmp_path
         # While the board exports, the compact loader covers both panes.
         assert preview.size() == window.LOADER_SIZE
         assert preview.stack.currentWidget() is preview.loading
-        assert preview.loading.geometry() == preview.rect()
-        assert preview.childAt(QPoint(preview.width() - 10, 10)) is preview.loading
+        content = preview.rect()
+        assert preview.loading.geometry() == content
+        assert preview.childAt(content.bottomRight() - QPoint(10, 10)) is preview.loading
         assert preview.loading.progress.minimum() == preview.loading.progress.maximum() == 0
 
         # After export, load the model while keeping the compact loader visible.
@@ -93,8 +94,7 @@ def test_loading_covers_split_until_viewport_is_ready(app, monkeypatch, tmp_path
         assert preview.loading.isHidden()
         assert preview.size() == expanded
         assert preview.viewer.fitted_size == preview.viewer.size()
-        assert preview.viewer.fitted_size.height() == expanded.height()
-        assert preview.size().width() > window.LOADER_SIZE.width()
+        assert preview.viewer.fitted_size.height() == expanded.height() - preview.menu_bar.height()
         assert preview.controls.width() == 240
         assert preview.controls.findChild(QLabel).text() == "Viewport"
         buttons = {button.text(): button for button in preview.controls.findChildren(QPushButton)}
@@ -170,7 +170,7 @@ def test_render_captures_camera_palette_format_and_snapshot(app, monkeypatch, tm
         texture.setCurrentText("Crinkled Paper")
         resolution.setCurrentText("4K")
         ratio.setCurrentText("4:3")
-        render.button.click()
+        preview.menu_bar.render_action.trigger()
         palette.setCurrentText("Blue")
         background.setCurrentText("Transparent")
         ratio.setCurrentText("1:1")

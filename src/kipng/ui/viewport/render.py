@@ -124,8 +124,6 @@ def save_viewport_render(
         "RGBA",
         frame.bytesPerLine(),
     )
-    if image.getchannel("A").getbbox() is None:
-        raise PreviewError("No board is visible in the render frame. Check the viewport framing.")
 
     name = Path(snapshot.project_name).name or "board"
     try:

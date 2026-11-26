@@ -11,7 +11,7 @@ from threading import Event
 
 from PIL import Image, ImageChops, ImageFilter
 
-from ..contracts import PreviewCancelled, PreviewError
+from ..contracts import PreviewCancelled
 from ..contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
 from ..contracts.render import DEFAULT_SHADOW, ShadowSettings
 from .background import apply_background
@@ -29,19 +29,11 @@ def composite(
     shadow_settings: ShadowSettings = DEFAULT_SHADOW,
 ) -> Image.Image:
     alpha = board.getchannel("A")
-    bounds = alpha.getbbox()
-    if bounds is None:
-        raise PreviewError("The board is outside the render frame. Pan toward the center.")
-    if alpha.getextrema()[0] != 0:
-        raise PreviewError("KiCad did not render a board on a transparent background.")
-    left, top, right, bottom = bounds
     # Crop around the optical center so the viewport pan stays in the render.
     width, height = frame_size
     crop_x = (board.width - width) // 2
     crop_y = (board.height - height) // 2
     crop = (crop_x, crop_y, crop_x + width, crop_y + height)
-    if left < crop[0] or top < crop[1] or right > crop[2] or bottom > crop[3]:
-        raise PreviewError("The board exceeds the render frame. Zoom out or pan toward the center.")
 
     red, green, blue, board_alpha = board.crop(crop).split()
     lift = [round(255 * (value / 255) ** 0.90) for value in range(256)]
@@ -49,9 +41,12 @@ def composite(
         "RGBA", (red.point(lift), green.point(lift), blue.point(lift), board_alpha)
     )
     opacity = shadow_settings.opacity
-    if opacity == 0:
+    bounds = alpha.getbbox()
+    if opacity == 0 or bounds is None:
         return lit_board
 
+    # Use the padded canvas for the shadow, including any board outside the final crop.
+    left, top, right, bottom = bounds
     shape = alpha.crop(bounds)
     shadow_width = round(shape.width * SHADOW_SCALE)
     shadow_height = round(shape.height * SHADOW_SCALE)
