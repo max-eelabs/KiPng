@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 
 from kipng.contracts import BoardSnapshot, PreviewError, ViewportCamera
 from kipng.contracts.colors import COLOR_SCHEMES
+from kipng.contracts.render import DEFAULT_OUTPUT_SIZE
 from kipng.ui import window
 from kipng.ui.controls.sections.viewport import CAMERA_PRESETS
 from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
@@ -21,6 +22,7 @@ from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
 class FakeViewport(QWidget):
     ready = Signal()
     failed = Signal(str)
+    output_size = DEFAULT_OUTPUT_SIZE
 
     def load_model(self, model):
         self.model = model
@@ -30,6 +32,9 @@ class FakeViewport(QWidget):
 
     def set_color_scheme(self, scheme):
         self.color_scheme = scheme
+
+    def set_output_size(self, size):
+        self.output_size = size
 
     def release_model(self):
         self.released = True
@@ -127,11 +132,11 @@ def test_export_error_stays_on_loading_screen(app, tmp_path):
         preview.shutdown()
 
 
-def test_render_captures_current_camera_palette_and_snapshot(app, monkeypatch, tmp_path):
+def test_render_captures_camera_palette_format_and_snapshot(app, monkeypatch, tmp_path):
     # Provide a preview snapshot and a camera to capture after the model opens.
     snapshot = BoardSnapshot("edited board", tmp_path, "project")
     camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07)
-    output = tmp_path / "project-render-1080x1920.png"
+    output = tmp_path / "project-render-2880x2160.png"
     renderer = Mock(return_value=output)
     monkeypatch.setattr(window, "BoardViewport", FakeViewport)
     monkeypatch.setattr(FakeViewport, "capture_camera", lambda self: camera, raising=False)
@@ -150,15 +155,23 @@ def test_render_captures_current_camera_palette_and_snapshot(app, monkeypatch, t
         preview.viewer.ready.emit()
         assert render.button.isEnabled()
 
-        # Clicking Render captures the palette even if the next selection changes.
-        selector = preview.controls.findChild(QComboBox)
-        selector.setCurrentText("White")
+        # Clicking Render captures both selections even if the controls change.
+        palette, resolution, ratio = preview.controls.findChildren(QComboBox)
+        palette.setCurrentText("White")
+        resolution.setCurrentText("4K")
+        ratio.setCurrentText("4:3")
         render.button.click()
-        selector.setCurrentText("Blue")
+        palette.setCurrentText("Blue")
+        ratio.setCurrentText("1:1")
         assert not render.button.isEnabled()
         wait_for(render.button.isEnabled)
         renderer.assert_called_once_with(
-            snapshot, camera, tmp_path, preview.cancelled, color_scheme=COLOR_SCHEMES["White"]
+            snapshot,
+            camera,
+            tmp_path,
+            preview.cancelled,
+            color_scheme=COLOR_SCHEMES["White"],
+            output_size=(2880, 2160),
         )
         assert not render.status.isHidden()
         assert render.status.toolTip() == str(output)

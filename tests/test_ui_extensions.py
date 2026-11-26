@@ -3,8 +3,9 @@
 
 from threading import Event
 
+import pytest
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel
 
 from kipng.ui.controls import sections
 from kipng.ui.controls.panel import ControlsPanel
@@ -28,6 +29,8 @@ def test_controls_panel_discovers_new_section(app, monkeypatch, tmp_path):
         "Discovered section",
         "Viewport",
         "Color Scheme",
+        "Resolution",
+        "Aspect Ratio",
     ]
 
 
@@ -82,6 +85,61 @@ def test_viewport_forwards_qml_failure(app, tmp_path):
         # Forward the QML error text to the Python signal consumer.
         root.loadFailed.emit("Model could not be opened.")
         assert messages[-1] == "Model could not be opened."
+    finally:
+        view.release_model()
+        view.close()
+
+
+def test_render_frame_follows_aspect_ratio_and_viewport_size(app, tmp_path):
+    # Load the viewport and connect the actual format controls.
+    view = pane.BoardViewport()
+    view.resize(800, 600)
+    view.load_model(tmp_path / "unused.glb")
+    panel = ControlsPanel(lambda: view, None, Event())
+    panel.set_ready(None)
+    _, resolution, ratio = panel.findChildren(QComboBox)
+    checkbox = panel.findChild(QCheckBox)
+    try:
+        # The overlay starts hidden and the default guide is portrait.
+        root = view.rootObject()
+        root.setProperty("boardRadius", 1.0)
+        QTest.qWait(20)
+        (frame,) = [
+            child
+            for item in root.childItems()
+            for child in item.childItems()
+            if child.objectName() == "renderFrame"
+        ]
+        assert not frame.property("visible")
+        assert (resolution.currentText(), ratio.currentText()) == ("FHD", "9:16")
+        assert ratio.itemText(1) == "3:4"
+        assert root.property("renderFrameWidth") / root.property("renderFrameHeight") == 9 / 16
+
+        # Show the guide and check every aspect ratio at 4K.
+        checkbox.click()
+        assert frame.property("visible")
+        resolution.setCurrentText("4K")
+        for label, size in (
+            ("9:16", (2160, 3840)),
+            ("3:4", (2160, 2880)),
+            ("16:9", (3840, 2160)),
+            ("4:3", (2880, 2160)),
+            ("1:1", (2160, 2160)),
+        ):
+            ratio.setCurrentText(label)
+            assert view.output_size == size
+            width = root.property("renderFrameWidth")
+            height = root.property("renderFrameHeight")
+            assert width / height == pytest.approx(size[0] / size[1])
+            assert width <= root.width() - 32
+            assert height <= root.height() - 32
+
+        # Resize the viewport and hide the guide without changing the output size.
+        root.setWidth(400)
+        assert root.property("renderFrameWidth") < width
+        checkbox.click()
+        assert not frame.property("visible")
+        assert view.output_size == (2160, 2160)
     finally:
         view.release_model()
         view.close()

@@ -14,11 +14,13 @@ from PIL import Image
 
 from ..contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
 from ..contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, PREVIEW_COPPER_RGB, BoardColors
+from ..contracts.render import DEFAULT_OUTPUT_SIZE, FHD_SIZES
 from .board import stage_board
 from .cli import find_cli, run_cli
-from .render_image import COMPOSITE_SIZE, composite, save_image
+from .render_image import SCALE, composite, save_image
 
-CANVAS_SIZE = (2304, 3968)
+# Leave room around the PNG crop for the shadow and edge checks.
+CANVAS_PADDING = (144, 128)
 RENDER_TIMEOUT_SECONDS = 600
 KEY_LIGHT = "0.2"
 RENDER_SETTINGS = {
@@ -81,7 +83,7 @@ def render_environment(work: Path, cli: Path, color_scheme: BoardColors) -> dict
     return env
 
 
-def camera_arguments(camera: ViewportCamera) -> tuple[list[str], tuple[int, int]]:
+def camera_arguments(camera: ViewportCamera, canvas_height: int, frame_width: int) -> list[str]:
     if min(camera.distance, camera.board_span, camera.frame_half_width) <= 0:
         raise PreviewError("The board is behind the camera. Pan back to the board and zoom out.")
 
@@ -92,17 +94,15 @@ def camera_arguments(camera: ViewportCamera) -> tuple[list[str], tuple[int, int]
     top_visible = tilt <= 90 or tilt >= 270
 
     # KiCad normalizes the longest board edge to 12.8 and starts at distance 16.
-    # Match the shorter viewport axis to the usable width of the portrait crop.
+    # Match the guide width in GLB units to the centered crop of the 45-degree raytrace.
     units_per_glb = 12.8 / camera.board_span
     half_width = camera.frame_half_width * units_per_glb
-    focal_pixels = CANVAS_SIZE[1] / (2 * tan(pi / 8))
-    distance = half_width * (2 * focal_pixels / COMPOSITE_SIZE[0])
+    focal_pixels = canvas_height / (2 * tan(pi / 8))
+    distance = half_width * (2 * focal_pixels / frame_width)
     zoom = 16 / distance
 
     pan_x = -camera.pan_x * units_per_glb
     pan_y = -camera.pan_y * units_per_glb
-    # Keep the screen-space translation when the reference crop recenters the silhouette.
-    translation = (round(pan_x * focal_pixels / distance), round(-pan_y * focal_pixels / distance))
     return [
         "--side",
         "top",
@@ -118,7 +118,7 @@ def camera_arguments(camera: ViewportCamera) -> tuple[list[str], tuple[int, int]
         KEY_LIGHT if top_visible else "0",
         "--light-bottom",
         "0" if top_visible else KEY_LIGHT,
-    ], translation
+    ]
 
 
 def render_board_image(
@@ -128,15 +128,23 @@ def render_board_image(
     cancelled: Event,
     *,
     color_scheme: BoardColors = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME],
+    output_size: tuple[int, int] = DEFAULT_OUTPUT_SIZE,
 ) -> Path:
-    camera_args, translation = camera_arguments(camera)
+    # Supersample FHD. The same raytrace canvas provides native pixels for 4K.
+    composite_size = (
+        (output_size[0] * SCALE, output_size[1] * SCALE)
+        if output_size in FHD_SIZES.values()
+        else output_size
+    )
+    width = composite_size[0] + CANVAS_PADDING[0]
+    height = composite_size[1] + CANVAS_PADDING[1]
+    camera_args = camera_arguments(camera, height, composite_size[0])
     cli = find_cli(snapshot.preferred_cli, cancelled)
     try:
         with TemporaryDirectory(prefix="kipng-render-") as directory:
             work = Path(directory)
             env = render_environment(work, cli, color_scheme)
             target = work / "board.png"
-            width, height = CANVAS_SIZE
             with stage_board(snapshot, work) as staged_board:
                 args = [
                     str(cli),
@@ -166,8 +174,8 @@ def render_board_image(
             if not target.is_file():
                 raise PreviewError("KiCad finished without producing a render.")
             with Image.open(target) as raw:
-                master = composite(raw.convert("RGBA"), translation)
+                master = composite(raw.convert("RGBA"), composite_size)
             name = Path(snapshot.project_name).name or "board"
-            return save_image(master, output_dir, name, cancelled)
+            return save_image(master, output_dir, name, cancelled, output_size)
     except (OSError, ValueError) as error:
         raise PreviewError(f"Could not render the board.\n\n{error}") from error

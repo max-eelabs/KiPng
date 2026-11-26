@@ -41,7 +41,11 @@ class RenderControls(QWidget):
         layout.addWidget(self.button, alignment=Qt.AlignmentFlag.AlignRight)
 
     def start(
-        self, snapshot: BoardSnapshot, camera: ViewportCamera, color_scheme: BoardColors
+        self,
+        snapshot: BoardSnapshot,
+        camera: ViewportCamera,
+        color_scheme: BoardColors,
+        output_size: tuple[int, int],
     ) -> None:
         if self.worker is not None or self.cancelled.is_set():
             return
@@ -56,7 +60,7 @@ class RenderControls(QWidget):
         self.button.setText("Rendering…")
         self.worker = Thread(
             target=self.render,
-            args=(snapshot, camera, Path(destination), color_scheme),
+            args=(snapshot, camera, Path(destination), color_scheme, output_size),
             name="board-render",
         )
         self.worker.start()
@@ -68,11 +72,17 @@ class RenderControls(QWidget):
         camera: ViewportCamera,
         output_dir: Path,
         color_scheme: BoardColors,
+        output_size: tuple[int, int],
     ) -> None:
         try:
             self.results.put(
                 self.renderer(
-                    snapshot, camera, output_dir, self.cancelled, color_scheme=color_scheme
+                    snapshot,
+                    camera,
+                    output_dir,
+                    self.cancelled,
+                    color_scheme=color_scheme,
+                    output_size=output_size,
                 )
             )
         except PreviewCancelled:
