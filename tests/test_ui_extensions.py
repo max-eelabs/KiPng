@@ -66,3 +66,22 @@ def test_viewport_discovers_new_qml_overlay(app, monkeypatch, tmp_path):
     finally:
         view.release_model()
         view.close()
+
+
+def test_viewport_forwards_qml_failure(app, tmp_path):
+    # Observe the Python widget's error signal.
+    view = pane.BoardViewport()
+    messages = []
+    view.failed.connect(messages.append)
+    try:
+        # Load the QML scene through the viewport widget.
+        view.load_model(tmp_path / "board.glb")
+        root = view.rootObject()
+        assert root is not None, [error.toString() for error in view.errors()]
+
+        # Forward the QML error text to the Python signal consumer.
+        root.loadFailed.emit("Model could not be opened.")
+        assert messages[-1] == "Model could not be opened."
+    finally:
+        view.release_model()
+        view.close()

@@ -13,6 +13,7 @@ from threading import Event
 from PIL import Image
 
 from ..contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
+from ..contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, PREVIEW_COPPER_RGB, BoardColors
 from .board import stage_board
 from .cli import find_cli, run_cli
 from .render_image import COMPOSITE_SIZE, composite, save_image
@@ -38,7 +39,12 @@ RENDER_SETTINGS = {
 }
 
 
-def render_environment(work: Path, cli: Path) -> dict[str, str]:
+def theme_color(color: str, opacity: float = 1.0) -> str:
+    red, green, blue = bytes.fromhex(color.removeprefix("#"))
+    return f"rgba({red}, {green}, {blue}, {opacity:g})"
+
+
+def render_environment(work: Path, cli: Path, color_scheme: BoardColors) -> dict[str, str]:
     # Isolate the raytracer's settings from the running KiCad editor.
     config_root = work / "config"
     config = config_root / "10.0"
@@ -47,6 +53,25 @@ def render_environment(work: Path, cli: Path) -> dict[str, str]:
         json.dumps({"meta": {"version": 4}, "render": RENDER_SETTINGS}), encoding="utf-8"
     )
     (config / "kicad_advanced").write_text("MaximumThreads=1\n", encoding="ascii")
+
+    # When no stackup override is requested, KiCad 10 reads the 3D colors from user.json.
+    colors = config / "colors"
+    colors.mkdir()
+    mask = theme_color(color_scheme.solder_mask, color_scheme.mask_opacity)
+    silk = theme_color(color_scheme.silkscreen)
+    red, green, blue = (round(channel * 255) for channel in PREVIEW_COPPER_RGB)
+    theme = {
+        "meta": {"name": "KiPng", "version": 5},
+        "3d_viewer": {
+            "board": theme_color(color_scheme.dielectric),
+            "copper": f"rgb({red}, {green}, {blue})",
+            "soldermask_top": mask,
+            "soldermask_bottom": mask,
+            "silkscreen_top": silk,
+            "silkscreen_bottom": silk,
+        },
+    }
+    (colors / "user.json").write_text(json.dumps(theme), encoding="utf-8")
 
     env = dict(os.environ, KICAD_CONFIG_HOME=str(config_root))
     if "KICAD10_3DMODEL_DIR" not in env:
@@ -97,14 +122,19 @@ def camera_arguments(camera: ViewportCamera) -> tuple[list[str], tuple[int, int]
 
 
 def render_board_image(
-    snapshot: BoardSnapshot, camera: ViewportCamera, output_dir: Path, cancelled: Event
+    snapshot: BoardSnapshot,
+    camera: ViewportCamera,
+    output_dir: Path,
+    cancelled: Event,
+    *,
+    color_scheme: BoardColors = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME],
 ) -> Path:
     camera_args, translation = camera_arguments(camera)
     cli = find_cli(snapshot.preferred_cli, cancelled)
     try:
         with TemporaryDirectory(prefix="kipng-render-") as directory:
             work = Path(directory)
-            env = render_environment(work, cli)
+            env = render_environment(work, cli, color_scheme)
             target = work / "board.png"
             width, height = CANVAS_SIZE
             with stage_board(snapshot, work) as staged_board:

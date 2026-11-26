@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from threading import Event
@@ -9,6 +10,7 @@ import pytest
 from PIL import Image
 
 from kipng.contracts import BoardSnapshot, ViewportCamera
+from kipng.contracts.colors import COLOR_SCHEMES
 from kipng.export import render
 
 
@@ -53,7 +55,20 @@ def test_render_stages_live_board_and_saves_one_portrait_png(monkeypatch, tmp_pa
         assert cancel_event is cancelled
         assert timeout == render.RENDER_TIMEOUT_SECONDS
         assert Path(args[-1]).read_text(encoding="utf-8") == snapshot.text
-        assert (Path(env["KICAD_CONFIG_HOME"]) / "10.0/3d_viewer.json").is_file()
+        config = Path(env["KICAD_CONFIG_HOME"]) / "10.0"
+        assert (config / "3d_viewer.json").is_file()
+
+        # Apply all palette materials to both sides without overriding them from the stackup.
+        assert "--use-board-stackup-colors" not in args
+        theme = json.loads((config / "colors/user.json").read_text(encoding="utf-8"))
+        assert theme["3d_viewer"] == {
+            "board": "rgba(224, 222, 218, 1)",
+            "copper": "rgb(168, 138, 76)",
+            "soldermask_top": "rgba(195, 198, 204, 0.73)",
+            "soldermask_bottom": "rgba(195, 198, 204, 0.73)",
+            "silkscreen_top": "rgba(17, 19, 22, 1)",
+            "silkscreen_bottom": "rgba(17, 19, 22, 1)",
+        }
 
         # Supply a transparent raytrace with an opaque board silhouette.
         raw = Image.new("RGBA", render.CANVAS_SIZE)
@@ -62,7 +77,9 @@ def test_render_stages_live_board_and_saves_one_portrait_png(monkeypatch, tmp_pa
 
     # Save one portrait PNG and preserve the previous export.
     monkeypatch.setattr(render, "run_cli", run_cli)
-    output = render.render_board_image(snapshot, camera, tmp_path, cancelled)
+    output = render.render_board_image(
+        snapshot, camera, tmp_path, cancelled, color_scheme=COLOR_SCHEMES["White"]
+    )
     assert output.name == "project-render-2-1080x1920.png"
     assert existing.read_bytes() == b"previous output"
     assert set(tmp_path.iterdir()) == {existing, output}

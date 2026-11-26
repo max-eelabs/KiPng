@@ -9,9 +9,10 @@ from PySide6.QtCore import QObject, QPoint, QUrl, Signal
 from PySide6.QtGui import QVector3D
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 
 from kipng.contracts import BoardSnapshot, PreviewError, ViewportCamera
+from kipng.contracts.colors import COLOR_SCHEMES
 from kipng.ui import window
 from kipng.ui.controls.sections.viewport import CAMERA_PRESETS
 from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
@@ -26,6 +27,9 @@ class FakeViewport(QWidget):
 
     def fit_board(self):
         self.fitted_size = self.size()
+
+    def set_color_scheme(self, scheme):
+        self.color_scheme = scheme
 
     def release_model(self):
         self.released = True
@@ -123,7 +127,7 @@ def test_export_error_stays_on_loading_screen(app, tmp_path):
         preview.shutdown()
 
 
-def test_render_captures_current_camera_and_preview_snapshot(app, monkeypatch, tmp_path):
+def test_render_captures_current_camera_palette_and_snapshot(app, monkeypatch, tmp_path):
     # Provide a preview snapshot and a camera to capture after the model opens.
     snapshot = BoardSnapshot("edited board", tmp_path, "project")
     camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07)
@@ -146,11 +150,16 @@ def test_render_captures_current_camera_and_preview_snapshot(app, monkeypatch, t
         preview.viewer.ready.emit()
         assert render.button.isEnabled()
 
-        # Clicking Render passes the displayed board and camera to the worker.
+        # Clicking Render captures the palette even if the next selection changes.
+        selector = preview.controls.findChild(QComboBox)
+        selector.setCurrentText("White")
         render.button.click()
+        selector.setCurrentText("Blue")
         assert not render.button.isEnabled()
         wait_for(render.button.isEnabled)
-        renderer.assert_called_once_with(snapshot, camera, tmp_path, preview.cancelled)
+        renderer.assert_called_once_with(
+            snapshot, camera, tmp_path, preview.cancelled, color_scheme=COLOR_SCHEMES["White"]
+        )
         assert not render.status.isHidden()
         assert render.status.toolTip() == str(output)
     finally:
@@ -223,25 +232,6 @@ def test_viewport_orbit_passes_both_poles(app):
                 view.set_camera_view(pitch, yaw, align)
                 camera = view.capture_camera()
                 assert (camera.pitch, camera.yaw) == (pitch, yaw + (turn if align else 0))
-    finally:
-        view.release_model()
-        view.close()
-
-
-def test_viewport_forwards_qml_failure(app, tmp_path):
-    # Observe the Python widget's error signal.
-    view = BoardViewport()
-    messages = []
-    view.failed.connect(messages.append)
-    try:
-        # Load the QML scene through the viewport widget.
-        view.load_model(tmp_path / "board.glb")
-        root = view.rootObject()
-        assert root is not None, [error.toString() for error in view.errors()]
-
-        # Forward the QML error text to the Python signal consumer.
-        root.loadFailed.emit("Model could not be opened.")
-        assert messages[-1] == "Model could not be opened."
     finally:
         view.release_model()
         view.close()

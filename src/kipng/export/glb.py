@@ -12,11 +12,11 @@ from math import isclose
 from pathlib import Path
 
 from ..contracts import BOARD_MATERIAL_TAGS
+from ..contracts.colors import PREVIEW_COPPER_RGB
 from .paste import add_paste_surfaces
 
 LED_HOUSING_RGB = (0.778, 0.770, 0.626)
 KICAD_COPPER_RGB = (0.7, 0.61, 0.0)
-PREVIEW_COPPER_RGB = (0.66, 0.54, 0.30)
 
 
 def prepare_preview_materials(

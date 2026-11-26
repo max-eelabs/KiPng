@@ -11,7 +11,8 @@ from PySide6.QtQuick3D import QQuick3DObject
 from PySide6.QtQuickWidgets import QQuickWidget
 
 from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
-from .colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
+from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
+from .colors import layer_colors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
 FEATURES_DIR = VIEWPORT_QML.with_name("features")
@@ -30,6 +31,7 @@ class BoardViewport(QQuickWidget):
         self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self.sceneGraphError.connect(self.show_graphics_error)
         self.board_materials: list[tuple[QQuick3DObject, str]] = []
+        self.color_scheme = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME]
 
     def show_graphics_error(self, _error, message: str) -> None:
         self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
@@ -56,7 +58,7 @@ class BoardViewport(QQuickWidget):
             layer = layers_by_tag.get(material.property("alphaCutoff"))
             if layer is not None:
                 self.board_materials.append((material, layer))
-        self.set_color_scheme(COLOR_SCHEMES[DEFAULT_COLOR_SCHEME])
+        self.set_color_scheme(self.color_scheme)
 
     def release_model(self) -> None:
         self.board_materials.clear()
@@ -64,7 +66,8 @@ class BoardViewport(QQuickWidget):
 
     def set_color_scheme(self, scheme: BoardColors) -> None:
         """Apply a palette to the loaded board."""
-        colors = scheme.layer_colors()
+        self.color_scheme = scheme
+        colors = layer_colors(scheme)
         for material, layer in self.board_materials:
             material.setProperty("baseColor", colors[layer])
 
