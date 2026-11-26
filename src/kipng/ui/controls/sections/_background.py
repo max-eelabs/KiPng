@@ -3,7 +3,6 @@
 
 """Background presets, custom color input, and texture selection."""
 
-import re
 from collections.abc import Callable
 
 from PySide6.QtCore import QSignalBlocker
@@ -11,11 +10,11 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QLineEdit
 
 from ....contracts.background import BACKGROUND_COLORS, BackgroundSettings, BackgroundTexture
+from ....contracts.options import BACKGROUND, RGB_HEX, TEXTURE, slug
 from ...viewport.pane import BoardViewport
 
 CUSTOM = "Custom"
 DEFAULT_CUSTOM_COLOR = "#E4DDD2"
-RGB_HEX = re.compile(r"#?([0-9a-fA-F]{6})")
 
 
 def swatch(color: str | None) -> QIcon:
@@ -36,8 +35,9 @@ def add_background_controls(
     options: QFormLayout, get_viewport: Callable[[], BoardViewport | None]
 ) -> None:
     selector = QComboBox(objectName="backgroundSelector")
-    for name, color in BACKGROUND_COLORS.items():
-        selector.addItem(swatch(color), name)
+    for name in BACKGROUND.labels:
+        selector.addItem(swatch(BACKGROUND_COLORS[name]), name)
+    selector.setCurrentText(BACKGROUND.default)
     selector.addItem(swatch(DEFAULT_CUSTOM_COLOR), CUSTOM)
     custom_index = selector.count() - 1
 
@@ -45,14 +45,14 @@ def add_background_controls(
     custom.setPlaceholderText("#RRGGBB")
     hint = QLabel(wordWrap=True, objectName="backgroundHexHint")
     texture = QComboBox(objectName="backgroundTexture")
-    for choice in BackgroundTexture:
-        texture.addItem(choice.label, choice.value)
-    options.addRow("Background", selector)
+    for label in TEXTURE.labels:
+        texture.addItem(label, slug(label))
+    options.addRow(BACKGROUND.label, selector)
     options.addRow("Hex Color", custom)
     options.addRow(hint)
-    options.addRow("Texture", texture)
+    options.addRow(TEXTURE.label, texture)
     custom_color = DEFAULT_CUSTOM_COLOR
-    preferred_texture = BackgroundTexture.NONE
+    preferred_texture = BackgroundTexture(slug(TEXTURE.default))
 
     def apply_background() -> None:
         nonlocal custom_color

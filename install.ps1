@@ -30,7 +30,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $package '__init__.py') -PathType Le
 # Assemble KiCad's install layout from the distribution files and the source package.
 $files = [ordered]@{}
 $files['LICENSE'] = Join-Path $PSScriptRoot 'LICENSE'
-foreach ($name in @('requirements.txt', 'icon-light.png', 'icon-dark.png', 'kipng-logo.svg', 'kipng-logo.ico', 'preview.py', 'plugin.json')) {
+foreach ($name in @('requirements.txt', 'icon-light.png', 'icon-dark.png', 'kipng-logo.svg', 'kipng-logo.ico', 'preview.py', 'render.py', 'plugin.json')) {
     $file = Join-Path $plugin $name
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
         throw "Missing plugin file: $name"

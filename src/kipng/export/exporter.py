@@ -21,6 +21,12 @@ def export_board_model(
 ) -> BoardSnapshot:
     board_source = source if source is not None else KiCadBoardSource()
     snapshot = board_source.read(cancelled)
+    export_snapshot_model(snapshot, output, cancelled)
+    return snapshot
+
+
+def export_snapshot_model(snapshot: BoardSnapshot, output: Path, cancelled: Event) -> None:
+    """Write the preview GLB from an already captured board."""
     if cancelled.is_set():
         raise PreviewCancelled
     cli = find_cli(snapshot.preferred_cli, cancelled)
@@ -55,8 +61,6 @@ def export_board_model(
                 prepare_preview_materials(output, board_name=board_path.stem, paste_plots=plots)
         except (OSError, ValueError, struct.error) as error:
             raise PreviewError(f"Could not read the exported board model.\n\n{error}") from error
-
-    return snapshot
 
 
 def export_paste_plots(cli: Path, board: Path, output: Path, cancelled: Event) -> dict[str, Path]:

@@ -1,13 +1,15 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import shlex
+import sys
 from unittest.mock import Mock
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLineEdit, QSlider, QStyle
 
-from kipng.contracts import BoardSnapshot, PreviewError
+from kipng.contracts import BoardSnapshot, PreviewError, ViewportCamera
 from kipng.contracts.background import DEFAULT_BACKGROUND
 from kipng.contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME
 from kipng.contracts.render import DEFAULT_OUTPUT_SIZE, DEFAULT_SHADOW, RenderEngine
@@ -45,6 +47,7 @@ def test_file_menu_reload_preserves_settings_and_refreshes_snapshot(app, monkeyp
         assert QKeySequence.mnemonic(file_menu.title()).toString() == "Alt+F"
         assert [QKeySequence.mnemonic(action.text()).toString() for action in actions] == [
             "Alt+R",
+            "Alt+C",
             "Alt+L",
             "Alt+D",
             "Alt+X",
@@ -150,6 +153,67 @@ def test_reset_restores_startup_camera_and_render_controls(app, monkeypatch, tmp
         assert not view.render_frame_visible
         angles = view.rootObject().property("cameraAngles")
         assert (angles.x(), angles.y()) == (-82, -34)
+    finally:
+        preview.close()
+        preview.shutdown()
+
+
+def test_copy_cli_captures_the_effective_view(app, monkeypatch, tmp_path):
+    # Load the renderer controls with a saved PCB whose path needs shell quoting.
+    def load_scene(self, _model):
+        self.setSource(QUrl.fromLocalFile(str(VIEWPORT_QML)))
+
+    board = tmp_path / "Robin's PCB.kicad_pcb"
+    board.touch()
+    snapshot = BoardSnapshot("board", tmp_path, board.stem, board_path=board)
+    camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07)
+    monkeypatch.setattr(BoardViewport, "load_model", load_scene)
+    monkeypatch.setattr(BoardViewport, "capture_camera", lambda _: camera)
+    preview = window.PreviewWindow(tmp_path / "board.glb", lambda *_: snapshot, Mock())
+    preview.start()
+    try:
+        # Choose a styled custom background and type an incomplete replacement.
+        wait_for(lambda: preview.viewer is not None)
+        preview.viewer.ready.emit()
+        engine, palette, background, texture, resolution, ratio = preview.controls.findChildren(
+            QComboBox
+        )
+        engine.setCurrentText("Viewport")
+        palette.setCurrentText("Purple")
+        background.setCurrentText("Custom")
+        hex_color = preview.controls.findChild(QLineEdit)
+        hex_color.setText("#123456")
+        texture.setCurrentText("Fabric Grain")
+        hex_color.setText("#12345")
+        resolution.setCurrentText("4K")
+        ratio.setCurrentText("16:9")
+        for slider, value in zip(preview.controls.findChildren(QSlider), (-10, 25, 70)):
+            slider.setValue(value)
+
+        # The clipboard uses the last applied color and the current crop and lighting.
+        preview.menu_bar.copy_cli_action.trigger()
+        command = app.clipboard().text()
+        expected = (
+            "--camera=-55,40,0.2,-0.01,0.02,0.1,0.07",
+            "--engine=viewport",
+            "--color-scheme=purple",
+            "--background=#123456",
+            "--texture=fabric-grain",
+            "--resolution=4k",
+            "--aspect-ratio=16:9",
+            "--light-x=-10",
+            "--light-y=25",
+            "--shadow=70",
+        )
+        if sys.platform == "win32":
+            assert command.startswith("& ")
+            assert command.endswith(" | Write-Output")
+            assert "Robin''s PCB.kicad_pcb'" in command
+            assert all(f"'{arg}'" in command for arg in expected)
+        else:
+            args = shlex.split(command)
+            assert args[2] == str(board)
+            assert tuple(args[3:]) == expected
     finally:
         preview.close()
         preview.shutdown()

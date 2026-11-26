@@ -31,6 +31,12 @@ dependencies untouched.
 - The installer assembles the runtime package beside the KiCad manifest.
   Verify imports and QML asset paths from the installed layout when changing
   package structure.
+- Expose every image-affecting control through the CLI and **File > Copy CLI**.
+  Define render control labels, defaults, choices, and ranges in
+  `src/kipng/contracts/options.py` so the GUI and CLI share the same metadata.
+  Include the effective value when capturing render settings and verify that the
+  copied arguments restore it. Camera controls may be represented by the
+  resolved pose. UI-only controls such as the framing guide do not need flags.
 
 ## Comments and Contracts
 
@@ -102,7 +108,8 @@ python -m pytest
 Tests should use temporary directories and run without a live KiCad session.
 Use test doubles at IPC and exporter boundaries where needed and keep Qt tests
 compatible with the offscreen platform. The
-[Windows CI workflow](.github/workflows/ci.yml) checks Python 3.10 and 3.13.
+[CI workflow](.github/workflows/ci.yml) checks the CLI entrypoint and runs the
+test suite on Windows, Linux, and macOS with Python 3.10.
 For changes affecting KiCad integration, installation, or viewport behavior,
 also smoke-test the affected path in KiCad 10.0 when available. Report live
 KiCad checks separately from automated tests.

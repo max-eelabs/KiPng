@@ -13,15 +13,19 @@ from PySide6.QtQuickWidgets import QQuickWidget
 from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
 from ...contracts.background import DEFAULT_BACKGROUND, WHITE, BackgroundSettings, BackgroundTexture
 from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
-from ...contracts.render import DEFAULT_OUTPUT_SIZE, DEFAULT_SHADOW, RenderEngine, ShadowSettings
+from ...contracts.render import (
+    DEFAULT_OUTPUT_SIZE,
+    DEFAULT_SHADOW,
+    FRONT_PITCH,
+    FRONT_YAW,
+    RenderEngine,
+    ShadowSettings,
+)
 from .background import BackgroundImageProvider
 from .colors import layer_colors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
 FEATURES_DIR = VIEWPORT_QML.with_name("features")
-# The front pose assumes the board lies lengthwise along Z.
-FRONT_PITCH = -82
-FRONT_YAW = -34
 
 
 class BoardViewport(QQuickWidget):

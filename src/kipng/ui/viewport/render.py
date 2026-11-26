@@ -9,7 +9,7 @@ from threading import Event
 
 from PIL import Image
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QImage
+from PySide6.QtGui import QColor, QImage, QScreen
 
 from ...contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
 from ...contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
@@ -21,23 +21,22 @@ from .pane import BoardViewport
 CAPTURE_TIMEOUT_MS = 30_000
 
 
-class ViewportCapture(BoardViewport):
-    """Own a hidden render surface on the GUI thread until a frame is ready."""
+class RenderSurface(BoardViewport):
+    """Load a model into a hidden Qt Quick 3D surface on the GUI thread."""
 
-    captured = Signal(QImage)
+    loaded = Signal()
 
     def __init__(
         self,
-        source: BoardViewport,
-        camera: ViewportCamera,
+        model: Path,
         color_scheme: BoardColors,
         output_size: tuple[int, int],
         *,
         shadow: ShadowSettings = DEFAULT_SHADOW,
+        screen: QScreen | None = None,
     ) -> None:
         super().__init__()
-        self.model = Path(source.rootObject().property("modelSource").toLocalFile())
-        self.camera = camera
+        self.model = model
         self.set_color_scheme(color_scheme)
         self.set_output_size(output_size)
         self.set_shadow(shadow)
@@ -47,13 +46,15 @@ class ViewportCapture(BoardViewport):
         surface_format.setAlphaBufferSize(8)
         self.setFormat(surface_format)
         self.setClearColor(QColor("transparent"))
-        self.setScreen(source.screen())
+        if screen is not None:
+            self.setScreen(screen)
         scale = self.devicePixelRatioF()
         self.resize(*(ceil(pixels / scale) for pixels in output_size))
         self.timeout = QTimer(self, singleShot=True, interval=CAPTURE_TIMEOUT_MS)
+        self.failure: str | None = None
         self.timeout.timeout.connect(self.capture_timeout)
-        self.ready.connect(self.grab_render)
-        self.failed.connect(self.timeout.stop)
+        self.ready.connect(self.model_ready)
+        self.failed.connect(self.record_failure)
 
     def start(self) -> None:
         self.timeout.start()
@@ -67,36 +68,70 @@ class ViewportCapture(BoardViewport):
         if self.timeout.isActive():
             self.grabFramebuffer()
 
-    def grab_render(self) -> None:
-        if not self.timeout.isActive():
-            return
-
-        camera = self.camera
-        self.rootObject().setRenderCamera(
-            camera.pitch,
-            camera.yaw,
-            camera.distance,
-            camera.pan_x,
-            camera.pan_y,
-            camera.frame_half_width,
-        )
-        frame = self.grabFramebuffer()
-        if not self.timeout.isActive():
-            return
-        self.timeout.stop()
-        if frame.isNull():
-            self.failed.emit("The viewport renderer could not capture a frame.")
-            return
-        self.captured.emit(frame)
+    def model_ready(self) -> None:
+        if self.timeout.isActive():
+            self.timeout.stop()
+            self.loaded.emit()
 
     def capture_timeout(self) -> None:
         self.failed.emit("The viewport renderer timed out while loading the 3D model.")
+
+    def record_failure(self, message: str) -> None:
+        self.failure = message
+        self.timeout.stop()
 
     def release(self) -> None:
         self.timeout.stop()
         self.release_model()
         self.close()
         self.deleteLater()
+
+    def grab_render(self, camera: ViewportCamera | None) -> QImage:
+        """Render the requested crop or use the camera already fitted to the model."""
+        if camera is not None:
+            self.rootObject().setRenderCamera(
+                camera.pitch,
+                camera.yaw,
+                camera.distance,
+                camera.pan_x,
+                camera.pan_y,
+                camera.frame_half_width,
+            )
+        frame = self.grabFramebuffer()
+        if self.failure is not None:
+            raise PreviewError(self.failure)
+        if frame.isNull():
+            raise PreviewError("The viewport renderer could not capture a frame.")
+        return frame
+
+
+class ViewportCapture(RenderSurface):
+    """Capture one PNG frame asynchronously for the preview controls."""
+
+    captured = Signal(QImage)
+
+    def __init__(
+        self,
+        source: BoardViewport,
+        camera: ViewportCamera,
+        color_scheme: BoardColors,
+        output_size: tuple[int, int],
+        *,
+        shadow: ShadowSettings = DEFAULT_SHADOW,
+    ) -> None:
+        model = Path(source.rootObject().property("modelSource").toLocalFile())
+        super().__init__(model, color_scheme, output_size, shadow=shadow, screen=source.screen())
+        self.camera = camera
+        self.loaded.connect(self.capture_frame)
+
+    def capture_frame(self) -> None:
+        try:
+            frame = self.grab_render(self.camera)
+        except PreviewError as error:
+            if self.failure is None:
+                self.failed.emit(str(error))
+        else:
+            self.captured.emit(frame)
 
 
 def save_viewport_render(

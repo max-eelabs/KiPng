@@ -12,6 +12,17 @@ class RenderEngine(Enum):
     VIEWPORT = "Viewport"
 
 
+# The front pose assumes the board lies lengthwise along Z.
+FRONT_PITCH = -82
+FRONT_YAW = -34
+# Turning both angles by 180 flips to the underside and mirrors the view.
+CAMERA_PRESETS = (
+    ("Default Front", FRONT_PITCH, FRONT_YAW, True),
+    ("Default Back", FRONT_PITCH + 180, FRONT_YAW + 180, True),
+    ("Straight Top", -90, 0, False),
+    ("Straight Bottom", 90, 180, False),
+)
+
 DEFAULT_OUTPUT_SIZE = (1080, 1920)
 FHD_SIZES = {
     "9:16": DEFAULT_OUTPUT_SIZE,

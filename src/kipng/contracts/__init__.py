@@ -31,6 +31,7 @@ class BoardSnapshot:
     project_dir: Path | None
     project_name: str
     preferred_cli: str | None = None
+    board_path: Path | None = None
 
 
 class BoardSource(Protocol):
