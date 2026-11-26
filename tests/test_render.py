@@ -11,8 +11,9 @@ from PIL import Image
 
 from kipng.contracts import BoardSnapshot, ViewportCamera
 from kipng.contracts.colors import COLOR_SCHEMES
-from kipng.contracts.render import DEFAULT_OUTPUT_SIZE
+from kipng.contracts.render import DEFAULT_OUTPUT_SIZE, ShadowSettings
 from kipng.export import render
+from kipng.export.render_image import composite
 
 
 def test_camera_tracks_orbit_zoom_and_pan():
@@ -106,3 +107,31 @@ def test_render_stages_live_board_and_saves_selected_png(
         center_x, center_y = (side // 2 for side in png.size)
         assert png.getpixel((center_x, center_y)) == (255, 255, 255)
         assert png.getpixel((center_x + 120, center_y))[1] in range(136, 140)
+
+
+def test_original_shadow_accepts_position_and_strength_settings():
+    # Use an opaque silhouette with room for the original scaled shadow.
+    board = Image.new("RGBA", (300, 300))
+    board.paste("green", (100, 80, 180, 140))
+    soft = composite(board, board.size).getchannel("A")
+    faded = composite(board, board.size, shadow_settings=ShadowSettings(strength=25))
+    off = composite(board, board.size, shadow_settings=ShadowSettings(strength=0))
+
+    # The left half of the slider fades the shadow and eventually removes it.
+    assert 0 < faded.getpixel((140, 145))[3] < soft.getpixel((140, 145))
+    assert off.getchannel("A").tobytes() == board.getchannel("A").tobytes()
+
+    # The right end preserves the scaled silhouette and removes the blur.
+    sharp = composite(board, board.size, shadow_settings=ShadowSettings(strength=100))
+    assert sharp.getpixel((140, 150))[3] == 46
+    assert sharp.getpixel((140, 151))[3] == 0
+    assert soft.getpixel((140, 151)) > 0
+
+    # Both light sliders translate that same crisp silhouette.
+    shifted = composite(board, board.size, shadow_settings=ShadowSettings(100, 100, 100))
+    band = (0, 142, 300, 300)
+    original_box, shifted_box = [
+        image.getchannel("A").crop(band).getbbox() for image in (sharp, shifted)
+    ]
+    assert original_box[0] - shifted_box[0] == 32
+    assert shifted_box[3] - original_box[3] == 32

@@ -13,7 +13,7 @@ from PySide6.QtQuickWidgets import QQuickWidget
 from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
 from ...contracts.background import DEFAULT_BACKGROUND, WHITE, BackgroundSettings, BackgroundTexture
 from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
-from ...contracts.render import DEFAULT_OUTPUT_SIZE, RenderEngine
+from ...contracts.render import DEFAULT_OUTPUT_SIZE, DEFAULT_SHADOW, RenderEngine, ShadowSettings
 from .background import BackgroundImageProvider
 from .colors import layer_colors
 
@@ -37,6 +37,7 @@ class BoardViewport(QQuickWidget):
         self.board_materials: list[tuple[QQuick3DObject, str]] = []
         self.color_scheme = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME]
         self.background = DEFAULT_BACKGROUND
+        self.shadow = DEFAULT_SHADOW
         self.output_size = DEFAULT_OUTPUT_SIZE
         self.render_engine = RenderEngine.RAY_TRACING
         self.render_frame_visible = False
@@ -61,6 +62,7 @@ class BoardViewport(QQuickWidget):
         self.show_render_frame(self.render_frame_visible)
         scene.setProperty("captureMode", capture)
         self.set_background(self.background)
+        self.set_shadow(self.shadow)
         if not capture:
             sources = [QUrl.fromLocalFile(str(path)) for path in sorted(FEATURES_DIR.glob("*.qml"))]
             scene.setProperty("featureSources", sources)
@@ -104,6 +106,16 @@ class BoardViewport(QQuickWidget):
         scene.setProperty("backgroundColor", QColor(background.color or WHITE))
         scene.setProperty("backgroundPattern", pattern)
         scene.setProperty("backgroundTextured", texture is not BackgroundTexture.NONE)
+
+    def set_shadow(self, shadow: ShadowSettings) -> None:
+        """Update the drop shadow and retain the settings across scene loads."""
+        self.shadow = shadow
+        scene = self.rootObject()
+        if scene is not None:
+            scene.setProperty("shadowOffsetX", shadow.offset_x)
+            scene.setProperty("shadowOffsetY", shadow.offset_y)
+            scene.setProperty("shadowOpacity", shadow.opacity)
+            scene.setProperty("shadowBlurFactor", shadow.blur_factor)
 
     def set_output_size(self, size: tuple[int, int]) -> None:
         """Update the output dimensions and the viewport guide's aspect ratio."""

@@ -3,6 +3,7 @@
 
 """Render engines and supported PNG dimensions."""
 
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -20,3 +21,37 @@ FHD_SIZES = {
     "1:1": (1080, 1080),
 }
 RESOLUTION_SCALES = {"FHD": 1, "4K": 2}
+
+SLIDER_MAX = 100
+SHADOW_MIDPOINT = SLIDER_MAX // 2
+LIGHT_TRAVEL = 16
+
+
+@dataclass(frozen=True)
+class ShadowSettings:
+    """Light coordinates in [-100, 100] and shadow strength in [0, 100]."""
+
+    light_x: int = 0
+    light_y: int = 0
+    strength: int = SHADOW_MIDPOINT
+
+    @property
+    def offset_x(self) -> float:
+        """Horizontal shadow offset in FHD pixels, positive to the right."""
+        return 3 - LIGHT_TRAVEL * self.light_x / SLIDER_MAX
+
+    @property
+    def offset_y(self) -> float:
+        """Vertical shadow offset in FHD pixels, positive down the image."""
+        return 4 + LIGHT_TRAVEL * self.light_y / SLIDER_MAX
+
+    @property
+    def opacity(self) -> float:
+        return 0.1798 * min(1.0, self.strength / SHADOW_MIDPOINT)
+
+    @property
+    def blur_factor(self) -> float:
+        return min(1.0, (SLIDER_MAX - self.strength) / SHADOW_MIDPOINT)
+
+
+DEFAULT_SHADOW = ShadowSettings()

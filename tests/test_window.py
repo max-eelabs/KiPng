@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 from kipng.contracts import BoardSnapshot, PreviewError, ViewportCamera
 from kipng.contracts.background import DEFAULT_BACKGROUND, BackgroundSettings, BackgroundTexture
 from kipng.contracts.colors import COLOR_SCHEMES
-from kipng.contracts.render import DEFAULT_OUTPUT_SIZE, RenderEngine
+from kipng.contracts.render import DEFAULT_OUTPUT_SIZE, RenderEngine, ShadowSettings
 from kipng.ui import window
 from kipng.ui.controls.sections.viewport import CAMERA_PRESETS
 from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
@@ -25,6 +25,7 @@ class FakeViewport(QWidget):
     output_size = DEFAULT_OUTPUT_SIZE
     render_engine = RenderEngine.RAY_TRACING
     background = DEFAULT_BACKGROUND
+    shadow = ShadowSettings(-60, 30, 80)
 
     def load_model(self, model):
         self.model = model
@@ -182,6 +183,7 @@ def test_render_captures_camera_palette_format_and_snapshot(app, monkeypatch, tm
             color_scheme=COLOR_SCHEMES["White"],
             output_size=(2880, 2160),
             background=BackgroundSettings("#E4DDD2", BackgroundTexture.CRINKLED_PAPER),
+            shadow=FakeViewport.shadow,
         )
         assert not render.status.isHidden()
         assert render.status.toolTip() == str(output)

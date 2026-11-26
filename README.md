@@ -21,6 +21,8 @@ In **Render**, choose **Ray Tracing** for KiCad's raytraced lighting or **Viewpo
 
 Choose **Background** to change the backdrop in the preview and exported PNG. Use White, one of the muted presets, or **Custom** with a six-digit RGB hex color. On opaque colors other than pure white, set **Texture** to None, Fabric Grain, or Crinkled Paper. **Transparent** displays a checkerboard in the preview and saves a PNG with transparency and a soft shadow.
 
+Drag **Light X** and **Light Y** to move the shadow. All three sliders start centered. Drag **Shadow** left to fade it out or right to sharpen it. The controls apply to the live preview and both PNG engines.
+
 In the **Viewport** section, turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Adjust the camera to keep the board inside the frame, then click **Render** and choose a folder. The PNG uses the current camera angle, zoom, pan, and background with a soft shadow.
 
 ## Project structure

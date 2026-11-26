@@ -10,6 +10,7 @@ from typing import Protocol
 
 from .background import DEFAULT_BACKGROUND, BackgroundSettings
 from .colors import BoardColors
+from .render import DEFAULT_SHADOW, ShadowSettings
 
 # Qt 6.8's RuntimeLoader drops glTF material names, but retains alphaCutoff.
 # KiCad's opaque and blended board layers ignore this cutoff when rendered.
@@ -68,6 +69,7 @@ class ImageRenderer(Protocol):
         color_scheme: BoardColors,
         output_size: tuple[int, int],
         background: BackgroundSettings = DEFAULT_BACKGROUND,
+        shadow: ShadowSettings = DEFAULT_SHADOW,
     ) -> Path:
         """Save a PNG in the selected directory and return its path."""
         ...

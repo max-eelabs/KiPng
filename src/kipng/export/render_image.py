@@ -13,16 +13,21 @@ from PIL import Image, ImageChops, ImageFilter
 
 from ..contracts import PreviewCancelled, PreviewError
 from ..contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
+from ..contracts.render import DEFAULT_SHADOW, ShadowSettings
 from .background import apply_background
 
 # Composite at twice FHD to keep the shadow consistent across resolutions.
 SCALE = 2
 SHADOW_SCALE = 1.08
-SHADOW_OFFSET = (3, 20)
 SHADOW_BLUR = 8
 
 
-def composite(board: Image.Image, frame_size: tuple[int, int]) -> Image.Image:
+def composite(
+    board: Image.Image,
+    frame_size: tuple[int, int],
+    *,
+    shadow_settings: ShadowSettings = DEFAULT_SHADOW,
+) -> Image.Image:
     alpha = board.getchannel("A")
     bounds = alpha.getbbox()
     if bounds is None:
@@ -38,12 +43,20 @@ def composite(board: Image.Image, frame_size: tuple[int, int]) -> Image.Image:
     if left < crop[0] or top < crop[1] or right > crop[2] or bottom > crop[3]:
         raise PreviewError("The board exceeds the render frame. Zoom out or pan toward the center.")
 
+    red, green, blue, board_alpha = board.crop(crop).split()
+    lift = [round(255 * (value / 255) ** 0.90) for value in range(256)]
+    lit_board = Image.merge(
+        "RGBA", (red.point(lift), green.point(lift), blue.point(lift), board_alpha)
+    )
+    opacity = shadow_settings.opacity
+    if opacity == 0:
+        return lit_board
+
     shape = alpha.crop(bounds)
     shadow_width = round(shape.width * SHADOW_SCALE)
     shadow_height = round(shape.height * SHADOW_SCALE)
-    offset_x, offset_y = SHADOW_OFFSET
-    shadow_x = round((left + right - shadow_width) / 2) + offset_x * SCALE
-    shadow_y = round((top + bottom - shadow_height) / 2) + offset_y * SCALE
+    shadow_x = round((left + right - shadow_width) / 2) + round(shadow_settings.offset_x * SCALE)
+    shadow_y = round((top + bottom - shadow_height) / 2) + round(shadow_settings.offset_y * SCALE)
 
     shadow_alpha = Image.new("L", board.size)
     shadow_shape = shape.resize((shadow_width, shadow_height), Image.Resampling.BICUBIC)
@@ -51,13 +64,11 @@ def composite(board: Image.Image, frame_size: tuple[int, int]) -> Image.Image:
 
     # Carry the shadow under the board to keep contact at the silhouette edge.
     shadow_alpha = ImageChops.lighter(shadow_alpha, alpha)
-    shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(SHADOW_BLUR * SCALE))
+    blur = SHADOW_BLUR * SCALE * shadow_settings.blur_factor
+    if blur > 0:
+        shadow_alpha = shadow_alpha.filter(ImageFilter.GaussianBlur(blur))
     shadow = Image.new("RGBA", frame_size, "black")
-    shadow.putalpha(shadow_alpha.crop(crop).point(lambda value: round(value * 0.31)))
-
-    red, green, blue, alpha = board.crop(crop).split()
-    lift = [round(255 * (value / 255) ** 0.90) for value in range(256)]
-    lit_board = Image.merge("RGBA", (red.point(lift), green.point(lift), blue.point(lift), alpha))
+    shadow.putalpha(shadow_alpha.crop(crop).point(lambda value: round(value * opacity)))
     return Image.alpha_composite(shadow, lit_board)
 
 

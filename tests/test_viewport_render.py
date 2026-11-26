@@ -4,22 +4,25 @@
 from threading import Event
 from unittest.mock import Mock
 
+import pytest
 from PIL import Image
-from PySide6.QtCore import QObject, Qt, QThread, Signal
+from PySide6.QtCore import QObject, Qt, QThread, QUrl, Signal
 from PySide6.QtGui import QColor, QImage, QPainter
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QComboBox
+from PySide6.QtWidgets import QComboBox, QSlider
 
 from kipng.contracts import BoardSnapshot, ViewportCamera
 from kipng.contracts.colors import COLOR_SCHEMES
+from kipng.contracts.render import DEFAULT_SHADOW, ShadowSettings
 from kipng.ui.controls import render
 from kipng.ui.controls.panel import ControlsPanel
-from kipng.ui.viewport.pane import BoardViewport
+from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
 
 
 def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypatch, tmp_path):
     # Replace the GPU with a frame that can be saved by the real worker.
     viewport = BoardViewport()
+    viewport.setSource(QUrl.fromLocalFile(str(VIEWPORT_QML)))
     camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07)
     monkeypatch.setattr(viewport, "capture_camera", lambda: camera)
     monkeypatch.setattr(render.QFileDialog, "getExistingDirectory", lambda *_: str(tmp_path))
@@ -29,14 +32,15 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
         captured = Signal(QImage)
         failed = Signal(str)
 
-        def __init__(self, view, pose, colors, size):
+        def __init__(self, view, pose, colors, size, *, shadow):
             super().__init__()
-            # The renderer receives the selected view, color, and portrait dimensions.
-            assert (view, pose, colors, size) == (
+            # The renderer receives the selected view, color, dimensions, and shadow.
+            assert (view, pose, colors, size, shadow) == (
                 viewport,
                 camera,
                 COLOR_SCHEMES["Blue"],
                 (1080, 1440),
+                ShadowSettings(100, 100, 100),
             )
 
         def start(self):
@@ -59,6 +63,22 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
     engine, palette, background, _, _, aspect_ratio = panel.findChildren(QComboBox)
     controls = panel.render_controls
     try:
+        # Start centered, then update the live QML shadow using the sliders.
+        light_x, light_y, shadow = panel.findChildren(QSlider)
+        assert viewport.shadow == DEFAULT_SHADOW
+        scene = viewport.rootObject()
+        assert scene.property("shadowOffsetX") == 3
+        assert scene.property("shadowOffsetY") == 4
+        assert scene.property("shadowOpacity") == pytest.approx(0.1798)
+        assert scene.property("shadowBlurFactor") == 1
+        for slider in (light_x, light_y, shadow):
+            assert slider.value() * 2 == slider.minimum() + slider.maximum()
+            slider.setValue(slider.maximum())
+        assert scene.property("shadowOffsetX") == -13
+        assert scene.property("shadowOffsetY") == 20
+        assert scene.property("shadowOpacity") == pytest.approx(0.1798)
+        assert scene.property("shadowBlurFactor") == 0
+
         # Switch engines, export one PNG, and wait for the save worker.
         engine.setCurrentText("Viewport")
         palette.setCurrentText("Blue")
@@ -66,6 +86,8 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
         aspect_ratio.setCurrentText("3:4")
         controls.button.click()
         background.setCurrentText("Warm Stone")
+        shadow.setValue(0)
+        assert scene.property("shadowOpacity") == 0
         for _ in range(100):
             if controls.button.isEnabled():
                 break
