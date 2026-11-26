@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from contextlib import nullcontext
+from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
 
@@ -61,7 +62,21 @@ def test_export_stages_project_and_cleans_up(monkeypatch, tmp_path, write_glb, o
     reader = SimpleNamespace(read=lambda cancelled: snapshot)
     monkeypatch.setattr(exporter, "find_cli", lambda preferred, cancelled: cli)
 
+    plotted = []
+
     def run_export_command(args, cancelled, timeout):
+        if args[3] == "svg":
+            # Plot both paste layers from the same staged board as the GLB.
+            directory = Path(args[args.index("--output") + 1])
+            staged = Path(args[-1])
+            assert staged.parent == project_dir
+            assert staged.read_text(encoding="utf-8") == snapshot.text
+            assert args[args.index("--layers") + 1] == "F.Paste,B.Paste"
+            assert "--exclude-drawing-sheet" in args
+            assert cancelled is cancellation
+            plotted.append(directory)
+            return
+
         # Check the arguments, timeout, and cancellation event passed to KiCad.
         assert args[:4] == [str(cli), "pcb", "export", "glb"]
         assert args[4:6] == ["--output", str(output)]
@@ -93,6 +108,7 @@ def test_export_stages_project_and_cleans_up(monkeypatch, tmp_path, write_glb, o
         exporter.export_board_model(output, cancellation, source=reader)
     if outcome == "success":
         assert output.read_bytes().startswith(b"glTF")
+        assert len(plotted) == 1 and not plotted[0].exists()
 
     # Cleanup always removes the staged files and preserves the original project.
     assert set(project_dir.iterdir()) == {original_board, original_project}

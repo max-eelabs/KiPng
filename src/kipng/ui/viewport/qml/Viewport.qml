@@ -11,12 +11,13 @@ Rectangle {
     id: viewport
 
     property url modelSource
+    property vector2d defaultAngles
+    property var featureSources: []
 
-    // Fit the board for the expanded viewport even while the compact loader is visible.
-    property real framingAspect: width / Math.max(height, 1)
     property vector3d boardCenter
     property real boardRadius: 0
-    property real boardSpan: 0
+    property vector3d boardExtent
+    readonly property real boardSpan: Math.max(boardExtent.x, boardExtent.z)
     readonly property bool framed: boardRadius > 0
     readonly property real verticalHalfAngle: boardCamera.fieldOfView * Math.PI / 360
     readonly property vector3d cameraAngles: orbitControls.angles
@@ -29,6 +30,28 @@ Rectangle {
         cameraDistance * Math.tan(verticalHalfAngle) * Math.min(1, width / Math.max(height, 1))
 
     signal loadFailed(string message)
+
+    function fitBoard() {
+        if (!framed)
+            return
+
+        cameraPivot.position = boardCenter
+        const aspect = width / Math.max(height, 1)
+        const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * aspect)
+        const halfAngle = Math.min(verticalHalfAngle, horizontalHalfAngle)
+        boardCamera.z = 1.1 * boardRadius / Math.sin(Math.max(halfAngle, 0.01))
+    }
+
+    function viewAngles(pitch: real, yaw: real, alignLongAxis: bool): vector3d {
+        // The preset assumes Z is the long axis. Turn a wider board a quarter turn.
+        const quarterTurn = alignLongAxis && boardExtent.x > boardExtent.z ? 90 : 0
+        return Qt.vector3d(pitch, yaw + quarterTurn, 0)
+    }
+
+    function setCameraView(pitch: real, yaw: real, alignLongAxis: bool) {
+        orbitControls.angles = viewAngles(pitch, yaw, alignLongAxis)
+        fitBoard()
+    }
 
     color: "white"
     clip: true
@@ -125,14 +148,9 @@ Rectangle {
 
                 viewport.boardCenter = bounds.minimum.plus(extent.times(0.5))
                 // The GLB board plane is XZ, with +Y pointing out of the top copper.
-                viewport.boardSpan = Math.max(extent.x, extent.z)
-                cameraPivot.position = viewport.boardCenter
-                const horizontalHalfAngle = Math.atan(
-                    Math.tan(viewport.verticalHalfAngle) * viewport.framingAspect
-                )
-                const halfAngle = Math.min(viewport.verticalHalfAngle, horizontalHalfAngle)
-                boardCamera.z = 1.1 * radius / Math.sin(Math.max(halfAngle, 0.01))
+                viewport.boardExtent = extent
                 viewport.boardRadius = radius
+                viewport.fitBoard()
             }
         }
     }
@@ -140,11 +158,21 @@ Rectangle {
     OrbitControls {
         id: orbitControls
         objectName: "orbitControls"
+        angles: viewport.viewAngles(viewport.defaultAngles.x, viewport.defaultAngles.y, true)
         anchors.fill: parent
         enabled: viewport.framed
         pivot: cameraPivot
         camera: boardCamera
         boardRadius: viewport.boardRadius
         verticalHalfAngle: viewport.verticalHalfAngle
+    }
+
+    Repeater {
+        model: viewport.framed ? viewport.featureSources : []
+        Loader {
+            required property url modelData
+            anchors.fill: parent
+            Component.onCompleted: setSource(modelData, { viewport: viewport })
+        }
     }
 }

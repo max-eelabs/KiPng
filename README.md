@@ -25,13 +25,20 @@ Click **Render** in the lower-right corner and choose a folder to save a 1080 ×
 | `src/kipng/app.py` | Application entrypoint that assembles and launches the preview. |
 | `src/kipng/contracts/` | Shared data, interfaces, and preview errors. |
 | `src/kipng/export/` | Board capture, CLI export, and GLB preview materials. |
-| `src/kipng/ui/` | Qt windows and loader. The QML scene and camera controls live in `ui/qml/`. |
+| `src/kipng/ui/window.py` | Window layout and loading state. |
+| `src/kipng/ui/viewport/` | Left pane, QML scene, camera interaction, and overlays. |
+| `src/kipng/ui/controls/` | Right pane, control sections, and the Render footer. |
 | `tests/` | Export, material, UI, installation, and source-length checks. |
 | `.github/workflows/ci.yml` | Windows CI for the supported Python range. |
 
 The exporter accepts a `BoardSource` for supplying board snapshots. The window accepts a `ModelExporter` and receives model readiness and errors from the viewport through Qt signals.
 
 The installer places the contents of `plugin/` and the `kipng` package together in KiCad's user plugin directory. This keeps KiCad's deployment layout out of the source tree.
+
+### Extend the preview
+
+- Add a QML component to [`src/kipng/ui/viewport/qml/features/`](src/kipng/ui/viewport/qml/features/README.md) to overlay controls or information on the 3D viewport.
+- Add a Python module to `src/kipng/ui/controls/sections/` that defines `create_section(get_viewport)` and returns a `QWidget`. The panel loads sections in filename order above Render. `get_viewport()` returns the current `BoardViewport` once it has been created, so call it when handling input. Filenames starting with `_` are reserved for helpers.
 
 ## Development and testing
 

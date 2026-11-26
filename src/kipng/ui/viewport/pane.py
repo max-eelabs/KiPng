@@ -6,12 +6,16 @@
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QVector2D
 from PySide6.QtQuickWidgets import QQuickWidget
 
-from ..contracts import ViewportCamera
+from ...contracts import ViewportCamera
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
+FEATURES_DIR = VIEWPORT_QML.with_name("features")
+# The front pose assumes the board lies lengthwise along Z.
+FRONT_PITCH = -82
+FRONT_YAW = -34
 
 
 class BoardViewport(QQuickWidget):
@@ -27,7 +31,7 @@ class BoardViewport(QQuickWidget):
     def show_graphics_error(self, _error, message: str) -> None:
         self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
 
-    def load_model(self, model: Path, framing_aspect: float) -> None:
+    def load_model(self, model: Path) -> None:
         self.setSource(QUrl.fromLocalFile(str(VIEWPORT_QML)))
         scene = self.rootObject()
         if scene is None:
@@ -38,11 +42,21 @@ class BoardViewport(QQuickWidget):
         # Defer switching pages while Qt handles the camera and bounds update.
         scene.framedChanged.connect(lambda: QTimer.singleShot(0, self.ready.emit))
         scene.loadFailed.connect(self.failed)
-        scene.setProperty("framingAspect", framing_aspect)
+        scene.setProperty("defaultAngles", QVector2D(FRONT_PITCH, FRONT_YAW))
+        sources = [QUrl.fromLocalFile(str(path)) for path in sorted(FEATURES_DIR.glob("*.qml"))]
+        scene.setProperty("featureSources", sources)
         scene.setProperty("modelSource", QUrl.fromLocalFile(str(model)))
 
     def release_model(self) -> None:
         self.setSource(QUrl())
+
+    def fit_board(self) -> None:
+        """Center and fit the board using the viewport's current size."""
+        self.rootObject().fitBoard()
+
+    def set_camera_view(self, pitch: float, yaw: float, align_long_axis: bool = False) -> None:
+        """Apply the view angles and refit the board to the current viewport."""
+        self.rootObject().setCameraView(pitch, yaw, align_long_axis)
 
     def capture_camera(self) -> ViewportCamera:
         """Read the framed camera on the GUI thread."""

@@ -9,7 +9,7 @@ MouseArea {
     required property PerspectiveCamera camera
     required property real boardRadius
     required property real verticalHalfAngle
-    property vector3d angles: Qt.vector3d(-55, -25, 0)
+    property vector3d angles
     property point previousPosition
 
     function wrapAngle(angle: real): real {

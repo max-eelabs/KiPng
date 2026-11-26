@@ -13,9 +13,9 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QStackedLayout, QWidget
 
 from ..contracts import BoardSnapshot, ImageRenderer, ModelExporter, PreviewCancelled, PreviewError
+from .controls.panel import ControlsPanel
 from .loading import LoadingScreen
-from .render_controls import RenderControls
-from .viewport import BoardViewport
+from .viewport.pane import BoardViewport
 
 VIEWPORT_TIMEOUT_MS = 30_000
 LOADER_SIZE = QSize(360, 160)
@@ -37,16 +37,11 @@ class PreviewWindow(QWidget):
         self.separator = QFrame()
         self.separator.setFrameShape(QFrame.Shape.VLine)
         self.cancelled = Event()
-        self.render_controls = RenderControls(renderer, self.cancelled) if renderer else None
-        self.controls = self.render_controls if self.render_controls is not None else QWidget()
-        if self.render_controls is not None:
-            self.render_controls.button.setEnabled(False)
-            self.render_controls.button.clicked.connect(self.start_render)
-        self.controls.setFixedWidth(240)
+        self.viewer: BoardViewport | None = None
+        self.controls = ControlsPanel(lambda: self.viewer, renderer, self.cancelled)
         self.split.addStretch(1)
         self.split.addWidget(self.separator)
         self.split.addWidget(self.controls)
-        self.viewer: BoardViewport | None = None
 
         # Let Qt initialize the viewport behind the loader without exposing the split.
         self.loading = LoadingScreen()
@@ -99,32 +94,26 @@ class PreviewWindow(QWidget):
 
     def load_model(self, model: Path) -> None:
         self.loading.message.setText("Opening 3D view…")
-        preview_size = self.expanded_size()
-        viewport_width = preview_size.width() - self.controls.width()
-        viewport_width -= max(0, self.separator.sizeHint().width())
         self.viewer = BoardViewport()
         self.viewer.ready.connect(self.show_workspace)
         self.viewer.failed.connect(self.show_error)
         self.split.takeAt(0)
         self.split.insertWidget(0, self.viewer, 1)
         self.viewport_timeout.start()
-        self.viewer.load_model(model, viewport_width / preview_size.height())
+        self.viewer.load_model(model)
 
     def show_workspace(self) -> None:
-        if not self.viewport_timeout.isActive() or self.cancelled.is_set():
+        if self.viewer is None or not self.viewport_timeout.isActive() or self.cancelled.is_set():
             return
         self.viewport_timeout.stop()
         self.setMinimumSize(PREVIEW_MINIMUM_SIZE)
         self.resize_centered(self.expanded_size())
+        # Refit after the compact loader has given way to the full viewport geometry.
+        self.split.activate()
+        self.viewer.fit_board()
         self.stack.setCurrentWidget(self.workspace)
         self.loading.hide()
-        if self.render_controls is not None and self.snapshot is not None:
-            self.render_controls.button.setEnabled(True)
-
-    def start_render(self) -> None:
-        if self.render_controls is None or self.snapshot is None or self.viewer is None:
-            return
-        self.render_controls.start(self.snapshot, self.viewer.capture_camera())
+        self.controls.set_ready(self.snapshot)
 
     def expanded_size(self) -> QSize:
         screen = self.screen().availableGeometry()
@@ -138,6 +127,7 @@ class PreviewWindow(QWidget):
 
     def show_error(self, message: str) -> None:
         self.viewport_timeout.stop()
+        self.controls.setEnabled(False)
         self.loading.show_error(message)
         self.loading.show()
         self.stack.setCurrentWidget(self.loading)
@@ -151,15 +141,13 @@ class PreviewWindow(QWidget):
         self.cancelled.set()
         self.poll.stop()
         self.viewport_timeout.stop()
-        if self.render_controls is not None:
-            self.render_controls.poll.stop()
+        self.controls.stop_polling()
         super().closeEvent(event)
 
     def shutdown(self) -> None:
         self.cancelled.set()
         if self.worker.ident is not None:
             self.worker.join()
-        if self.render_controls is not None:
-            self.render_controls.shutdown()
+        self.controls.shutdown()
         if self.viewer is not None:
             self.viewer.release_model()

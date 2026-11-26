@@ -5,6 +5,7 @@
 
 import struct
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from threading import Event
 
 from ..contracts import BoardSnapshot, BoardSource, PreviewCancelled, PreviewError
@@ -47,8 +48,45 @@ def export_board_model(
         if cancelled.is_set():
             raise PreviewCancelled
         try:
-            prepare_preview_materials(output)
+            with TemporaryDirectory(prefix="paste-", dir=output.parent) as directory:
+                plots = export_paste_plots(cli, board_path, Path(directory), cancelled)
+                if cancelled.is_set():
+                    raise PreviewCancelled
+                prepare_preview_materials(output, board_name=board_path.stem, paste_plots=plots)
         except (OSError, ValueError, struct.error) as error:
             raise PreviewError(f"Could not read the exported board model.\n\n{error}") from error
 
     return snapshot
+
+
+def export_paste_plots(cli: Path, board: Path, output: Path, cancelled: Event) -> dict[str, Path]:
+    # Keep board coordinates in millimetres by using the original page at scale 1.
+    run_cli(
+        [
+            str(cli),
+            "pcb",
+            "export",
+            "svg",
+            "--layers",
+            "F.Paste,B.Paste",
+            "--mode-multi",
+            "--page-size-mode",
+            "1",
+            "--scale",
+            "1",
+            "--exclude-drawing-sheet",
+            "--black-and-white",
+            "--drill-shape-opt",
+            "0",
+            "--output",
+            str(output),
+            str(board),
+        ],
+        cancelled,
+        EXPORT_TIMEOUT_SECONDS,
+    )
+    plots = {
+        side: output / f"{board.stem}-{layer}_Paste.svg"
+        for side, layer in (("front", "F"), ("back", "B"))
+    }
+    return {side: path for side, path in plots.items() if path.is_file()}

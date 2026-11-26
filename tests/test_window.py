@@ -1,34 +1,31 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import os
 from threading import Event
 from unittest.mock import Mock
 
 import pytest
 from PySide6.QtCore import QObject, QPoint, QUrl, Signal
+from PySide6.QtGui import QVector3D
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QWidget
 
 from kipng.contracts import BoardSnapshot, PreviewError, ViewportCamera
 from kipng.ui import window
-from kipng.ui.viewport import VIEWPORT_QML, BoardViewport
-
-
-@pytest.fixture(scope="module")
-def app():
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    return QApplication.instance() or QApplication([])
+from kipng.ui.controls.sections.viewport import CAMERA_PRESETS
+from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
 
 
 class FakeViewport(QWidget):
     ready = Signal()
     failed = Signal(str)
 
-    def load_model(self, model, framing_aspect):
+    def load_model(self, model):
         self.model = model
-        self.framing_aspect = framing_aspect
+
+    def fit_board(self):
+        self.fitted_size = self.size()
 
     def release_model(self):
         self.released = True
@@ -72,20 +69,29 @@ def test_loading_covers_split_until_viewport_is_ready(app, monkeypatch, tmp_path
         assert preview.stack.currentWidget() is preview.loading
         assert preview.size() == window.LOADER_SIZE
 
-        # Frame the board using the future viewport size before expanding.
+        # Fit the board at the expanded size and reveal the viewport presets.
         expanded = preview.expanded_size()
-        assert preview.viewer.framing_aspect == pytest.approx(
-            (expanded.width() - preview.controls.width()) / expanded.height(), abs=0.01
-        )
-
-        # Reveal the full window and its empty controls pane when the viewport is ready.
+        monkeypatch.setattr(preview.viewer, "set_camera_view", Mock(), raising=False)
+        assert not preview.controls.isEnabled()
         preview.viewer.ready.emit()
         assert preview.stack.currentWidget() is preview.workspace
         assert preview.loading.isHidden()
         assert preview.size() == expanded
+        assert preview.viewer.fitted_size == preview.viewer.size()
+        assert preview.viewer.fitted_size.height() == expanded.height()
         assert preview.size().width() > window.LOADER_SIZE.width()
         assert preview.controls.width() == 240
-        assert not preview.controls.findChildren(QWidget)
+        assert preview.controls.findChild(QLabel).text() == "Viewport"
+        buttons = {button.text(): button for button in preview.controls.findChildren(QPushButton)}
+        expected = {
+            "Default Front": (-82, -34, True),
+            "Default Back": (98, 146, True),
+            "Straight Top": (-90, 0, False),
+            "Straight Bottom": (90, 180, False),
+        }
+        for label, angles in expected.items():
+            buttons[label].click()
+            preview.viewer.set_camera_view.assert_called_with(*angles)
     finally:
         # Unblock the worker even if an assertion fails before export finishes.
         release_export.set()
@@ -126,7 +132,7 @@ def test_render_captures_current_camera_and_preview_snapshot(app, monkeypatch, t
     monkeypatch.setattr(window, "BoardViewport", FakeViewport)
     monkeypatch.setattr(FakeViewport, "capture_camera", lambda self: camera, raising=False)
     monkeypatch.setattr(
-        "kipng.ui.render_controls.QFileDialog.getExistingDirectory",
+        "kipng.ui.controls.render.QFileDialog.getExistingDirectory",
         lambda *args: str(tmp_path),
     )
     preview = window.PreviewWindow(tmp_path / "board.glb", lambda *_: snapshot, renderer)
@@ -134,7 +140,7 @@ def test_render_captures_current_camera_and_preview_snapshot(app, monkeypatch, t
     preview.start()
     try:
         # Enable the render button only once the preview is ready.
-        render = preview.render_controls
+        render = preview.controls.render_controls
         wait_for(lambda: preview.viewer is not None)
         assert not render.button.isEnabled()
         preview.viewer.ready.emit()
@@ -190,19 +196,33 @@ def test_qml_viewport_loads_without_a_gpu(app):
 def test_viewport_orbit_passes_both_poles(app):
     # Load the QML controls without a board or a graphics context.
     view = BoardViewport()
-    view.load_model(VIEWPORT_QML.parent / "unused.glb", 1.5)
+    view.load_model(VIEWPORT_QML.parent / "unused.glb")
     try:
-        controls = view.rootObject().findChild(QObject, "orbitControls")
+        root = view.rootObject()
+        controls = root.findChild(QObject, "orbitControls")
+
+        # Default Front turns a wide board without waiting for user input.
+        assert view.capture_camera().yaw == -34
+        root.setProperty("boardExtent", QVector3D(2, 0, 1))
+        assert view.capture_camera().yaw == 56
 
         # Drag past the top-down pole and keep the camera angle past the old limit.
         controls.orbit(0, 200)
-        assert view.capture_camera().pitch == pytest.approx(235)
+        assert view.capture_camera().pitch == pytest.approx(208)
 
         # Continue to the underside and then complete a full orbit.
         controls.orbit(0, 414.2857142857)
-        assert view.capture_camera().pitch == pytest.approx(90)
+        assert view.capture_camera().pitch == pytest.approx(63)
         controls.orbit(0, 414.2857142857)
-        assert view.capture_camera().pitch == pytest.approx(305)
+        assert view.capture_camera().pitch == pytest.approx(278)
+
+        # Rotate only the angled presets when the board's long axis changes.
+        for extent, turn in ((QVector3D(1, 0, 2), 0), (QVector3D(2, 0, 1), 90)):
+            view.rootObject().setProperty("boardExtent", extent)
+            for _, pitch, yaw, align in CAMERA_PRESETS:
+                view.set_camera_view(pitch, yaw, align)
+                camera = view.capture_camera()
+                assert (camera.pitch, camera.yaw) == (pitch, yaw + (turn if align else 0))
     finally:
         view.release_model()
         view.close()
@@ -214,11 +234,10 @@ def test_viewport_forwards_qml_failure(app, tmp_path):
     messages = []
     view.failed.connect(messages.append)
     try:
-        # Load the QML scene with the aspect ratio supplied by the main window.
-        view.load_model(tmp_path / "board.glb", 1.5)
+        # Load the QML scene through the viewport widget.
+        view.load_model(tmp_path / "board.glb")
         root = view.rootObject()
         assert root is not None, [error.toString() for error in view.errors()]
-        assert root.property("framingAspect") == 1.5
 
         # Forward the QML error text to the Python signal consumer.
         root.loadFailed.emit("Model could not be opened.")

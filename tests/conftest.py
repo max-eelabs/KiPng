@@ -2,16 +2,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
+import os
 import struct
 
 import pytest
+from PySide6.QtWidgets import QApplication
+
+
+@pytest.fixture(scope="session")
+def app():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    return QApplication.instance() or QApplication([])
 
 
 @pytest.fixture
 def write_glb():
-    def write(path, materials=None):
+    def write(path, materials=None, meshes=None):
         # Pad the JSON chunk to the four-byte GLB boundary.
         scene = {"asset": {"version": "2.0"}, "materials": materials or []}
+        if meshes is not None:
+            scene["meshes"] = meshes
         data = json.dumps(scene).encode("utf-8")
         data += b" " * (-len(data) % 4)
 
