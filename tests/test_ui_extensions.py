@@ -52,6 +52,9 @@ def test_controls_panel_discovers_new_section(app, monkeypatch, tmp_path):
         "Texture",
         "Resolution",
         "Aspect Ratio",
+        "Light X",
+        "Light Y",
+        "Shadow",
     ]
 
     # Keep the camera presets and guide in Viewport and the export selectors in Render.

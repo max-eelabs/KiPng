@@ -48,6 +48,7 @@ class RenderControls(QWidget):
         camera = view.capture_camera()
         color_scheme = view.color_scheme
         background = view.background
+        shadow = view.shadow
         output_size = view.output_size
         engine = view.render_engine
         initial_dir = snapshot.project_dir or Path.home()
@@ -67,7 +68,7 @@ class RenderControls(QWidget):
         self.button.setText("Rendering…")
         output_dir = Path(destination)
         if engine is RenderEngine.VIEWPORT:
-            self.capture = ViewportCapture(view, camera, color_scheme, output_size)
+            self.capture = ViewportCapture(view, camera, color_scheme, output_size, shadow=shadow)
             self.capture.captured.connect(
                 lambda frame: self.save_capture(
                     frame, snapshot, output_dir, output_size, background
@@ -88,6 +89,7 @@ class RenderControls(QWidget):
                 color_scheme=color_scheme,
                 output_size=output_size,
                 background=background,
+                shadow=shadow,
             )
         )
 

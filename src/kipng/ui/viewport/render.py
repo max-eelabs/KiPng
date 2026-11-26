@@ -14,6 +14,7 @@ from PySide6.QtGui import QColor, QImage
 from ...contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
 from ...contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
 from ...contracts.colors import BoardColors
+from ...contracts.render import DEFAULT_SHADOW, ShadowSettings
 from ...export.render_image import save_image
 from .pane import BoardViewport
 
@@ -31,12 +32,15 @@ class ViewportCapture(BoardViewport):
         camera: ViewportCamera,
         color_scheme: BoardColors,
         output_size: tuple[int, int],
+        *,
+        shadow: ShadowSettings = DEFAULT_SHADOW,
     ) -> None:
         super().__init__()
         self.model = Path(source.rootObject().property("modelSource").toLocalFile())
         self.camera = camera
         self.set_color_scheme(color_scheme)
         self.set_output_size(output_size)
+        self.set_shadow(shadow)
         self.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         surface_format = self.format()

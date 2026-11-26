@@ -19,6 +19,10 @@ Rectangle {
     property color backgroundColor: "white"
     property url backgroundPattern
     property bool backgroundTextured: false
+    property real shadowOffsetX: 3
+    property real shadowOffsetY: 4
+    property real shadowOpacity: 0.1798
+    property real shadowBlurFactor: 1
     readonly property real renderFrameInset: captureMode ? 0 : 16
     readonly property real renderFrameWidth: Math.min(
         Math.max(0, width - 2 * renderFrameInset),
@@ -109,11 +113,11 @@ Rectangle {
             blurMax: 24
             shadowEnabled: true
             shadowScale: 1.08
-            shadowBlur: Math.min(1, imageScale)
-            shadowOpacity: 0.31
-            shadowHorizontalOffset: 3 * imageScale
+            shadowBlur: Math.min(1, imageScale) * viewport.shadowBlurFactor
+            shadowOpacity: viewport.shadowOpacity
+            shadowHorizontalOffset: viewport.shadowOffsetX * imageScale
                 + viewport.cameraPan.x * pixelsPerUnit * (shadowScale - 1)
-            shadowVerticalOffset: 20 * imageScale
+            shadowVerticalOffset: viewport.shadowOffsetY * imageScale
                 - viewport.cameraPan.y * pixelsPerUnit * (shadowScale - 1)
         }
         environment: SceneEnvironment {

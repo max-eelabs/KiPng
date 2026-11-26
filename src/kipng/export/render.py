@@ -15,7 +15,7 @@ from PIL import Image
 from ..contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
 from ..contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
 from ..contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, PREVIEW_COPPER_RGB, BoardColors
-from ..contracts.render import DEFAULT_OUTPUT_SIZE, FHD_SIZES
+from ..contracts.render import DEFAULT_OUTPUT_SIZE, DEFAULT_SHADOW, FHD_SIZES, ShadowSettings
 from .board import stage_board
 from .cli import find_cli, run_cli
 from .render_image import SCALE, composite, save_image
@@ -131,6 +131,7 @@ def render_board_image(
     color_scheme: BoardColors = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME],
     output_size: tuple[int, int] = DEFAULT_OUTPUT_SIZE,
     background: BackgroundSettings = DEFAULT_BACKGROUND,
+    shadow: ShadowSettings = DEFAULT_SHADOW,
 ) -> Path:
     # Supersample FHD. The same raytrace canvas provides native pixels for 4K.
     composite_size = (
@@ -176,7 +177,7 @@ def render_board_image(
             if not target.is_file():
                 raise PreviewError("KiCad finished without producing a render.")
             with Image.open(target) as raw:
-                master = composite(raw.convert("RGBA"), composite_size)
+                master = composite(raw.convert("RGBA"), composite_size, shadow_settings=shadow)
             name = Path(snapshot.project_name).name or "board"
             return save_image(
                 master, output_dir, name, cancelled, output_size, background=background

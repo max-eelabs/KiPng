@@ -1,5 +1,6 @@
 - [x] Add selectable backgrounds with white, transparent, muted presets, custom hex colors, and procedural textures.
-- [ ] Add 2 draggable controls for adjusting light position which will affect shadow and ray tracing render 
+- [x] Add Light X, Light Y, and Shadow sliders for both render engines.
 - [ ] Add Icon for the plugin
+- [ ] Add reset to default button
 - [ ] Fix dashes change long to short on window headers etc
 - [ ] Add palette rendering option which will disable unrelated controls
