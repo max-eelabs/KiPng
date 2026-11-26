@@ -69,6 +69,7 @@ def test_file_menu_reload_preserves_settings_and_refreshes_snapshot(app, monkeyp
         assert not preview.menu_bar.reload_action.isEnabled()
         assert preview.menu_bar.isHidden()
         assert preview.size() == window.LOADER_SIZE
+        assert preview.loading.message.text() == "Preparing board…"
         wait_for(lambda: warning.called)
         assert preview.stack.currentWidget() is preview.workspace
         assert preview.snapshot == first

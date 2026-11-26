@@ -12,11 +12,13 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QComboBox, QSlider
 
 from kipng.contracts import BoardSnapshot, ViewportCamera
+from kipng.contracts.background import BackgroundSettings
 from kipng.contracts.colors import COLOR_SCHEMES
 from kipng.contracts.render import DEFAULT_SHADOW, ShadowSettings
 from kipng.ui.controls import render
 from kipng.ui.controls.panel import ControlsPanel
 from kipng.ui.viewport.pane import VIEWPORT_QML, BoardViewport
+from kipng.ui.viewport.render import save_viewport_render
 
 
 def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypatch, tmp_path):
@@ -49,7 +51,7 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
             image = QImage(1080, 1440, QImage.Format.Format_RGBA8888_Premultiplied)
             image.fill(Qt.GlobalColor.transparent)
             with QPainter(image) as painter:
-                painter.fillRect(10, 10, 20, 20, QColor("blue"))
+                painter.fillRect(-10, 10, 40, 20, QColor("blue"))
                 painter.fillRect(30, 30, 20, 20, QColor(0, 0, 0, 76))
             self.captured.emit(image)
 
@@ -102,8 +104,28 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
             assert image.size == (1080, 1440)
             assert image.mode == "RGBA"
             assert image.getpixel((0, 0)) == (0, 0, 0, 0)
-            assert image.getpixel((10, 10)) == (0, 0, 255, 255)
+            assert image.getpixel((0, 10)) == (0, 0, 255, 255)
             assert image.getpixel((30, 30)) == (0, 0, 0, 76)
     finally:
         panel.shutdown()
         viewport.close()
+
+
+@pytest.mark.parametrize(("color", "pixel"), [(None, (0, 0, 0, 0)), ("#FFFFFF", (255, 255, 255))])
+def test_viewport_exports_background_when_the_board_is_outside_the_crop(tmp_path, color, pixel):
+    # Simulate a valid capture with the camera panned entirely away from the board.
+    frame = QImage(80, 60, QImage.Format.Format_RGBA8888)
+    frame.fill(Qt.GlobalColor.transparent)
+
+    # Preserve the chosen background throughout the exported frame.
+    png = save_viewport_render(
+        frame,
+        BoardSnapshot("board", None, "test"),
+        tmp_path,
+        Event(),
+        (80, 60),
+        background=BackgroundSettings(color),
+    )
+    with Image.open(png) as image:
+        assert image.size == (80, 60)
+        assert image.getextrema() == tuple((channel, channel) for channel in pixel)

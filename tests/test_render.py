@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 
 from kipng.contracts import BoardSnapshot, ViewportCamera
+from kipng.contracts.background import BackgroundSettings
 from kipng.contracts.colors import COLOR_SCHEMES
 from kipng.contracts.render import DEFAULT_OUTPUT_SIZE, ShadowSettings
 from kipng.export import render
@@ -135,3 +136,49 @@ def test_original_shadow_accepts_position_and_strength_settings():
     ]
     assert original_box[0] - shifted_box[0] == 32
     assert shifted_box[3] - original_box[3] == 32
+
+
+@pytest.mark.parametrize(
+    ("board_bounds", "visible_bounds"),
+    [
+        ((40, 85, 110, 120), (0, 21, 38, 56)),
+        ((0, 0, 224, 188), (0, 0, 80, 60)),
+        ((5, 80, 40, 100), None),
+        (None, None),
+    ],
+)
+def test_ray_tracing_exports_the_visible_crop(monkeypatch, tmp_path, board_bounds, visible_bounds):
+    # Supply a CLI canvas that can show part of the board or no board at all.
+    monkeypatch.setattr(render, "find_cli", lambda *_: tmp_path / "kicad-cli.exe")
+
+    def run_cli(args, *_args, **_kwargs):
+        raw = Image.new("RGBA", (224, 188))
+        if board_bounds is not None:
+            raw.paste("green", board_bounds)
+        raw.save(args[args.index("--output") + 1])
+
+    monkeypatch.setattr(render, "run_cli", run_cli)
+    camera = ViewportCamera(-90, 0, 0.2, 0, 0, 0.1, 0.08)
+
+    # Export exactly the selected frame, with transparency where nothing is visible.
+    output = render.render_board_image(
+        BoardSnapshot("PCB", None, "test"),
+        camera,
+        tmp_path,
+        Event(),
+        output_size=(80, 60),
+        background=BackgroundSettings(None),
+        shadow=ShadowSettings(strength=0),
+    )
+    with Image.open(output) as image:
+        assert image.size == (80, 60)
+        assert image.getchannel("A").getbbox() == visible_bounds
+
+
+def test_ray_tracing_keeps_shadow_from_board_just_outside_crop():
+    # Put the board just above the frame so only its shadow falls inside.
+    board = Image.new("RGBA", (120, 120))
+    board.paste("green", (40, 5, 80, 19))
+    rendered = composite(board, (80, 80), shadow_settings=ShadowSettings(strength=100))
+    assert rendered.getpixel((40, 0)) == (0, 0, 0, 46)
+    assert rendered.getpixel((40, 30))[3] == 0

@@ -3,7 +3,7 @@
 - [x] Add the plugin toolbar, window, and taskbar icons.
 - [x] Fix long dashes - people will notice it is vibecoded
 - [x] Add top menu with file (render, reload board, reset to default and exit)
-- [ ] Add configuration export and command line support
+- [ ] Add configuration export (Copy CLI command) and command line support to execute command
 - [ ] Prepare for official repo listing 
 - [ ] Automate release builds, so we can produce standard 
 

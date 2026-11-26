@@ -8,6 +8,7 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QFrame, QLabel, QPlainTextEdit, QProgressBar, QVBoxLayout, QWidget
 
 LOADER_SIZE = QSize(360, 160)
+PREPARING_BOARD = "Preparing board…"
 
 
 def resize_centered(window: QWidget, size: QSize) -> None:
@@ -34,7 +35,7 @@ class LoadingScreen(QWidget):
         self.setPalette(palette)
         self.setAutoFillBackground(True)
 
-        self.message = QLabel("Preparing board…")
+        self.message = QLabel(PREPARING_BOARD)
         self.message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.message.setWordWrap(True)
         self.message.setTextFormat(Qt.TextFormat.PlainText)
@@ -61,7 +62,7 @@ class LoadingScreen(QWidget):
         layout.addWidget(self.error_details, 1)
 
     def show_progress(self) -> None:
-        self.message.setText("Preparing boardâ€¦")
+        self.message.setText(PREPARING_BOARD)
         self.error_details.hide()
         self.message.show()
         self.progress.show()

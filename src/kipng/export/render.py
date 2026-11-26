@@ -177,6 +177,8 @@ def render_board_image(
             if not target.is_file():
                 raise PreviewError("KiCad finished without producing a render.")
             with Image.open(target) as raw:
+                if "A" not in raw.getbands() and "transparency" not in raw.info:
+                    raise PreviewError("KiCad did not render a board on a transparent background.")
                 master = composite(raw.convert("RGBA"), composite_size, shadow_settings=shadow)
             name = Path(snapshot.project_name).name or "board"
             return save_image(

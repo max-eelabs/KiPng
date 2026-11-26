@@ -25,7 +25,7 @@ Choose **Background** to change the backdrop in the preview and exported PNG. Us
 
 Drag **Light X** and **Light Y** to move the shadow. All three sliders start centered. Drag **Shadow** left to fade it out or right to sharpen it. The controls apply to the live preview and both PNG engines.
 
-In the **Viewport** section, turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Adjust the camera to keep the board inside the frame, then click **Render** and choose a folder. The PNG uses the current camera angle, zoom, pan, and background with a soft shadow.
+In the **Viewport** section, turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Frame the part of the board you want to show, then click **Render** and choose a folder. Both engines crop the PNG to the frame, so the board can extend past the edges. The PNG uses the current camera angle, zoom, pan, and background with a soft shadow.
 
 ## Project structure
 
