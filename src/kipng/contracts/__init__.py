@@ -65,6 +65,7 @@ class ImageRenderer(Protocol):
         cancelled: Event,
         *,
         color_scheme: BoardColors,
+        output_size: tuple[int, int],
     ) -> Path:
         """Save a PNG in the selected directory and return its path."""
         ...

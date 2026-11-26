@@ -17,7 +17,9 @@ In the **Viewport** panel, use **Color Scheme** to preview green, red, white, bl
 
 The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. The project directory must be writable so the plugin can briefly save a snapshot beside the original board and retain relative model paths. VRML-only footprint models require a matching STEP or IGES file to appear in the GLB.
 
-Click **Render** in the lower-right corner and choose a folder to save a 1080 × 1920 portrait PNG. The render uses the current camera angle, zoom, and pan on the board shown in the preview. KiCad raytraces the board, then the plugin composites it on white with a soft shadow. If the board extends past the portrait frame, zoom out or pan toward the center and render again.
+Choose **FHD** or **4K** and an **Aspect Ratio** below **Color Scheme**. The default is FHD at 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
+
+Turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Adjust the camera to keep the board inside the frame, then click **Render** and choose a folder. The PNG uses the current camera angle, zoom, and pan. KiCad raytraces the board, and the plugin composites it on white with a soft shadow.
 
 ## Project structure
 

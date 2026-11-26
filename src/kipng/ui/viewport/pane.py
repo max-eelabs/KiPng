@@ -12,6 +12,7 @@ from PySide6.QtQuickWidgets import QQuickWidget
 
 from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
 from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
+from ...contracts.render import DEFAULT_OUTPUT_SIZE
 from .colors import layer_colors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
@@ -32,6 +33,8 @@ class BoardViewport(QQuickWidget):
         self.sceneGraphError.connect(self.show_graphics_error)
         self.board_materials: list[tuple[QQuick3DObject, str]] = []
         self.color_scheme = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME]
+        self.output_size = DEFAULT_OUTPUT_SIZE
+        self.render_frame_visible = False
 
     def show_graphics_error(self, _error, message: str) -> None:
         self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
@@ -49,6 +52,8 @@ class BoardViewport(QQuickWidget):
         scene.framedChanged.connect(lambda: QTimer.singleShot(0, self.ready.emit))
         scene.loadFailed.connect(self.failed)
         scene.setProperty("defaultAngles", QVector2D(FRONT_PITCH, FRONT_YAW))
+        self.set_output_size(self.output_size)
+        self.show_render_frame(self.render_frame_visible)
         sources = [QUrl.fromLocalFile(str(path)) for path in sorted(FEATURES_DIR.glob("*.qml"))]
         scene.setProperty("featureSources", sources)
         scene.setProperty("modelSource", QUrl.fromLocalFile(str(model)))
@@ -74,6 +79,19 @@ class BoardViewport(QQuickWidget):
     def fit_board(self) -> None:
         """Center and fit the board using the viewport's current size."""
         self.rootObject().fitBoard()
+
+    def set_output_size(self, size: tuple[int, int]) -> None:
+        """Update the output dimensions and the viewport guide's aspect ratio."""
+        self.output_size = size
+        scene = self.rootObject()
+        if scene is not None:
+            scene.setProperty("renderAspectRatio", size[0] / size[1])
+
+    def show_render_frame(self, visible: bool) -> None:
+        self.render_frame_visible = visible
+        scene = self.rootObject()
+        if scene is not None:
+            scene.setProperty("renderFrameVisible", visible)
 
     def set_camera_view(self, pitch: float, yaw: float, align_long_axis: bool = False) -> None:
         """Apply the view angles and refit the board to the current viewport."""

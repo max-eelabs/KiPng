@@ -13,6 +13,14 @@ Rectangle {
     property url modelSource
     property vector2d defaultAngles
     property var featureSources: []
+    property real renderAspectRatio: 9 / 16
+    property bool renderFrameVisible: false
+    readonly property real renderFrameInset: 16
+    readonly property real renderFrameWidth: Math.min(
+        Math.max(0, width - 2 * renderFrameInset),
+        Math.max(0, height - 2 * renderFrameInset) * renderAspectRatio
+    )
+    readonly property real renderFrameHeight: renderFrameWidth / renderAspectRatio
 
     property vector3d boardCenter
     property real boardRadius: 0
@@ -27,7 +35,7 @@ Rectangle {
         return Qt.vector2d(offset.dotProduct(cameraPivot.right), offset.dotProduct(cameraPivot.up))
     }
     readonly property real frameHalfWidth:
-        cameraDistance * Math.tan(verticalHalfAngle) * Math.min(1, width / Math.max(height, 1))
+        cameraDistance * Math.tan(verticalHalfAngle) * renderFrameWidth / Math.max(height, 1)
 
     signal loadFailed(string message)
 
@@ -36,9 +44,8 @@ Rectangle {
             return
 
         cameraPivot.position = boardCenter
-        const aspect = width / Math.max(height, 1)
-        const horizontalHalfAngle = Math.atan(Math.tan(verticalHalfAngle) * aspect)
-        const halfAngle = Math.min(verticalHalfAngle, horizontalHalfAngle)
+        const frameSpan = Math.min(renderFrameWidth, renderFrameHeight)
+        const halfAngle = Math.atan(Math.tan(verticalHalfAngle) * frameSpan / Math.max(height, 1))
         boardCamera.z = 1.1 * boardRadius / Math.sin(Math.max(halfAngle, 0.01))
     }
 
@@ -61,8 +68,9 @@ Rectangle {
         camera: boardCamera
         layer.enabled: true
         layer.effect: MultiEffect {
-            // Scale and offset the projected silhouette like the portrait render.
-            readonly property real imageScale: Math.min(viewport.width, viewport.height) / 1080
+            // Scale and offset the projected silhouette like the PNG render.
+            readonly property real imageScale:
+                Math.min(viewport.renderFrameWidth, viewport.renderFrameHeight) / 1080
             readonly property real pixelsPerUnit: viewport.cameraDistance > 0
                 ? viewport.height / (2 * viewport.cameraDistance * Math.tan(viewport.verticalHalfAngle))
                 : 0

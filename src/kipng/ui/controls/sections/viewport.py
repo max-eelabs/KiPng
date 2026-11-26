@@ -6,6 +6,7 @@
 from collections.abc import Callable
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QGridLayout,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ....contracts.render import FHD_SIZES, RESOLUTION_SCALES
 from ...viewport.colors import COLOR_SCHEMES
 from ...viewport.pane import FRONT_PITCH, FRONT_YAW, BoardViewport
 
@@ -57,7 +59,33 @@ def create_section(get_viewport: Callable[[], BoardViewport | None]) -> QWidget:
     color_scheme = QComboBox()
     color_scheme.addItems(list(COLOR_SCHEMES))
     color_scheme.currentTextChanged.connect(apply_color_scheme)
-    colors = QFormLayout()
-    colors.addRow("Color Scheme", color_scheme)
-    layout.addLayout(colors)
+    options = QFormLayout()
+    options.addRow("Color Scheme", color_scheme)
+
+    resolution = QComboBox()
+    resolution.addItems(list(RESOLUTION_SCALES))
+    aspect_ratio = QComboBox()
+    aspect_ratio.addItems(list(FHD_SIZES))
+
+    def apply_output_size() -> None:
+        viewport = get_viewport()
+        if viewport is not None:
+            scale = RESOLUTION_SCALES[resolution.currentText()]
+            width, height = FHD_SIZES[aspect_ratio.currentText()]
+            viewport.set_output_size((width * scale, height * scale))
+
+    resolution.currentTextChanged.connect(apply_output_size)
+    aspect_ratio.currentTextChanged.connect(apply_output_size)
+    options.addRow("Resolution", resolution)
+    options.addRow("Aspect Ratio", aspect_ratio)
+    layout.addLayout(options)
+
+    def show_render_frame(visible: bool) -> None:
+        viewport = get_viewport()
+        if viewport is not None:
+            viewport.show_render_frame(visible)
+
+    guide = QCheckBox("Show Render Frame")
+    guide.toggled.connect(show_render_frame)
+    layout.addWidget(guide)
     return section
