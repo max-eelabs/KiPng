@@ -5,7 +5,7 @@ from threading import Event
 
 import pytest
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel
+from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
 from kipng.ui.controls import sections
 from kipng.ui.controls.panel import ControlsPanel
@@ -22,16 +22,26 @@ def test_controls_panel_discovers_new_section(app, monkeypatch, tmp_path):
     )
     monkeypatch.setattr(sections, "__path__", [*sections.__path__, str(tmp_path)])
 
-    # The discovered section receives the same viewport accessor as the built-in section.
+    # The discovered section receives the same viewport accessor as the built-in sections.
     viewport = pane.BoardViewport()
     panel = ControlsPanel(lambda: viewport, None, Event())
-    assert [label.text() for label in panel.findChildren(QLabel)] == [
+    labels = panel.findChildren(QLabel)
+    assert [label.text() for label in labels] == [
         "Discovered section",
         "Viewport",
+        "Render",
+        "Engine",
         "Color Scheme",
         "Resolution",
         "Aspect Ratio",
     ]
+
+    # Keep the presets and guide in Viewport and all three selectors in Render.
+    viewport_section = labels[1].parentWidget()
+    render_section = labels[2].parentWidget()
+    assert len(viewport_section.findChildren(QPushButton)) == 4
+    assert viewport_section.findChild(QCheckBox).text() == "Show Render Frame"
+    assert render_section.findChildren(QComboBox) == panel.findChildren(QComboBox)
 
 
 def test_viewport_discovers_new_qml_overlay(app, monkeypatch, tmp_path):
@@ -97,7 +107,7 @@ def test_render_frame_follows_aspect_ratio_and_viewport_size(app, tmp_path):
     view.load_model(tmp_path / "unused.glb")
     panel = ControlsPanel(lambda: view, None, Event())
     panel.set_ready(None)
-    _, resolution, ratio = panel.findChildren(QComboBox)
+    engine, _, resolution, ratio = panel.findChildren(QComboBox)
     checkbox = panel.findChild(QCheckBox)
     try:
         # The overlay starts hidden and the default guide is portrait.
@@ -111,6 +121,7 @@ def test_render_frame_follows_aspect_ratio_and_viewport_size(app, tmp_path):
             if child.objectName() == "renderFrame"
         ]
         assert not frame.property("visible")
+        assert engine.currentText() == "Ray Tracing"
         assert (resolution.currentText(), ratio.currentText()) == ("FHD", "9:16")
         assert ratio.itemText(1) == "3:4"
         assert root.property("renderFrameWidth") / root.property("renderFrameHeight") == 9 / 16

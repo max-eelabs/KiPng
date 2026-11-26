@@ -15,7 +15,8 @@ Rectangle {
     property var featureSources: []
     property real renderAspectRatio: 9 / 16
     property bool renderFrameVisible: false
-    readonly property real renderFrameInset: 16
+    property bool captureMode: false
+    readonly property real renderFrameInset: captureMode ? 0 : 16
     readonly property real renderFrameWidth: Math.min(
         Math.max(0, width - 2 * renderFrameInset),
         Math.max(0, height - 2 * renderFrameInset) * renderAspectRatio
@@ -58,6 +59,17 @@ Rectangle {
     function setCameraView(pitch: real, yaw: real, alignLongAxis: bool) {
         orbitControls.angles = viewAngles(pitch, yaw, alignLongAxis)
         fitBoard()
+    }
+
+    function setRenderCamera(
+        pitch: real, yaw: real, distance: real, panX: real, panY: real, halfWidth: real
+    ) {
+        orbitControls.angles = Qt.vector3d(pitch, yaw, 0)
+        const pan = cameraPivot.right.times(panX).plus(cameraPivot.up.times(panY))
+        cameraPivot.position = boardCenter.plus(pan)
+        boardCamera.z = distance
+        // Narrow the field of view to fill the capture with the original crop.
+        boardCamera.fieldOfView = 360 / Math.PI * Math.atan(halfWidth / distance / renderAspectRatio)
     }
 
     color: "white"

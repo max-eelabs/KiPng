@@ -67,9 +67,7 @@ class ControlsPanel(QWidget):
     def start_render(self) -> None:
         view = self.get_viewport()
         if self.render_controls is not None and self.snapshot is not None and view is not None:
-            self.render_controls.start(
-                self.snapshot, view.capture_camera(), view.color_scheme, view.output_size
-            )
+            self.render_controls.start(self.snapshot, view)
 
     def stop_polling(self) -> None:
         if self.render_controls is not None:

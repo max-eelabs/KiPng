@@ -12,7 +12,7 @@ from PySide6.QtQuickWidgets import QQuickWidget
 
 from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
 from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
-from ...contracts.render import DEFAULT_OUTPUT_SIZE
+from ...contracts.render import DEFAULT_OUTPUT_SIZE, RenderEngine
 from .colors import layer_colors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
@@ -34,12 +34,13 @@ class BoardViewport(QQuickWidget):
         self.board_materials: list[tuple[QQuick3DObject, str]] = []
         self.color_scheme = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME]
         self.output_size = DEFAULT_OUTPUT_SIZE
+        self.render_engine = RenderEngine.RAY_TRACING
         self.render_frame_visible = False
 
     def show_graphics_error(self, _error, message: str) -> None:
         self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
 
-    def load_model(self, model: Path) -> None:
+    def load_model(self, model: Path, *, capture: bool = False) -> None:
         self.board_materials.clear()
         self.setSource(QUrl.fromLocalFile(str(VIEWPORT_QML)))
         scene = self.rootObject()
@@ -54,8 +55,10 @@ class BoardViewport(QQuickWidget):
         scene.setProperty("defaultAngles", QVector2D(FRONT_PITCH, FRONT_YAW))
         self.set_output_size(self.output_size)
         self.show_render_frame(self.render_frame_visible)
-        sources = [QUrl.fromLocalFile(str(path)) for path in sorted(FEATURES_DIR.glob("*.qml"))]
-        scene.setProperty("featureSources", sources)
+        scene.setProperty("captureMode", capture)
+        if not capture:
+            sources = [QUrl.fromLocalFile(str(path)) for path in sorted(FEATURES_DIR.glob("*.qml"))]
+            scene.setProperty("featureSources", sources)
         scene.setProperty("modelSource", QUrl.fromLocalFile(str(model)))
 
         layers_by_tag = {tag: layer for layer, tag in BOARD_MATERIAL_TAGS.items()}

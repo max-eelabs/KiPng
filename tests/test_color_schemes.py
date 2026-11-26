@@ -9,7 +9,7 @@ from PySide6.QtQuick3D import QQuick3DObject
 from PySide6.QtWidgets import QComboBox
 
 from kipng.export.glb import prepare_preview_materials
-from kipng.ui.controls.sections.viewport import create_section
+from kipng.ui.controls.sections.viewport_render import create_section
 from kipng.ui.viewport.pane import BoardViewport
 
 
@@ -72,7 +72,7 @@ def test_color_scheme_switches_live_board_materials_and_restores_green(app, tmp_
     prepare_preview_materials(model, board_name="board")
     view = BoardViewport()
     section = create_section(lambda: view)
-    selector = section.findChild(QComboBox)
+    _, selector, _, _ = section.findChildren(QComboBox)
     try:
         view.load_model(model)
         view.set_camera_view(-60, 30)
