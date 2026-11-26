@@ -9,9 +9,10 @@ from threading import Event
 
 from PIL import Image
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QColor, QImage
 
 from ...contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
+from ...contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
 from ...contracts.colors import BoardColors
 from ...export.render_image import save_image
 from .pane import BoardViewport
@@ -37,6 +38,11 @@ class ViewportCapture(BoardViewport):
         self.set_color_scheme(color_scheme)
         self.set_output_size(output_size)
         self.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        surface_format = self.format()
+        surface_format.setAlphaBufferSize(8)
+        self.setFormat(surface_format)
+        self.setClearColor(QColor("transparent"))
         self.setScreen(source.screen())
         scale = self.devicePixelRatioF()
         self.resize(*(ceil(pixels / scale) for pixels in output_size))
@@ -95,25 +101,30 @@ def save_viewport_render(
     output_dir: Path,
     cancelled: Event,
     output_size: tuple[int, int],
+    *,
+    background: BackgroundSettings = DEFAULT_BACKGROUND,
 ) -> Path:
     """Encode the captured frame on a worker after releasing the render surface."""
     if cancelled.is_set():
         raise PreviewCancelled
 
-    frame = frame.convertToFormat(QImage.Format.Format_RGB888)
+    if not frame.hasAlphaChannel():
+        raise PreviewError("The viewport renderer could not capture transparency.")
+    # Pillow composites straight alpha. Qt's framebuffer may be premultiplied.
+    frame = frame.convertToFormat(QImage.Format.Format_RGBA8888)
     image = Image.frombytes(
-        "RGB",
+        "RGBA",
         (frame.width(), frame.height()),
         frame.constBits(),
         "raw",
-        "RGB",
+        "RGBA",
         frame.bytesPerLine(),
     )
-    if image.getextrema() == ((255, 255),) * 3:
+    if image.getchannel("A").getbbox() is None:
         raise PreviewError("No board is visible in the render frame. Check the viewport framing.")
 
     name = Path(snapshot.project_name).name or "board"
     try:
-        return save_image(image, output_dir, name, cancelled, output_size)
+        return save_image(image, output_dir, name, cancelled, output_size, background=background)
     except OSError as error:
         raise PreviewError(f"Could not save the rendered PNG.\n\n{error}") from error

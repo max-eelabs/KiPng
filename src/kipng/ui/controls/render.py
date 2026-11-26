@@ -15,6 +15,7 @@ from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QFileDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from ...contracts import BoardSnapshot, ImageRenderer, PreviewCancelled, PreviewError
+from ...contracts.background import BackgroundSettings
 from ...contracts.render import RenderEngine
 from ..viewport.pane import BoardViewport
 from ..viewport.render import ViewportCapture, save_viewport_render
@@ -46,6 +47,7 @@ class RenderControls(QWidget):
 
         camera = view.capture_camera()
         color_scheme = view.color_scheme
+        background = view.background
         output_size = view.output_size
         engine = view.render_engine
         initial_dir = snapshot.project_dir or Path.home()
@@ -67,7 +69,9 @@ class RenderControls(QWidget):
         if engine is RenderEngine.VIEWPORT:
             self.capture = ViewportCapture(view, camera, color_scheme, output_size)
             self.capture.captured.connect(
-                lambda frame: self.save_capture(frame, snapshot, output_dir, output_size),
+                lambda frame: self.save_capture(
+                    frame, snapshot, output_dir, output_size, background
+                ),
                 Qt.ConnectionType.QueuedConnection,
             )
             self.capture.failed.connect(self.capture_failed, Qt.ConnectionType.QueuedConnection)
@@ -83,6 +87,7 @@ class RenderControls(QWidget):
                 self.cancelled,
                 color_scheme=color_scheme,
                 output_size=output_size,
+                background=background,
             )
         )
 
@@ -97,12 +102,19 @@ class RenderControls(QWidget):
         snapshot: BoardSnapshot,
         output_dir: Path,
         output_size: tuple[int, int],
+        background: BackgroundSettings,
     ) -> None:
         self.release_capture()
         if not self.cancelled.is_set():
             self.start_worker(
                 partial(
-                    save_viewport_render, frame, snapshot, output_dir, self.cancelled, output_size
+                    save_viewport_render,
+                    frame,
+                    snapshot,
+                    output_dir,
+                    self.cancelled,
+                    output_size,
+                    background=background,
                 )
             )
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Event
 from typing import Protocol
 
+from .background import DEFAULT_BACKGROUND, BackgroundSettings
 from .colors import BoardColors
 
 # Qt 6.8's RuntimeLoader drops glTF material names, but retains alphaCutoff.
@@ -66,6 +67,7 @@ class ImageRenderer(Protocol):
         *,
         color_scheme: BoardColors,
         output_size: tuple[int, int],
+        background: BackgroundSettings = DEFAULT_BACKGROUND,
     ) -> Path:
         """Save a PNG in the selected directory and return its path."""
         ...

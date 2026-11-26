@@ -4,12 +4,26 @@
 from threading import Event
 
 import pytest
+from PySide6.QtCore import QUrl
+from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton
 
 from kipng.ui.controls import sections
 from kipng.ui.controls.panel import ControlsPanel
 from kipng.ui.viewport import pane
+
+
+def test_qml_viewport_loads_without_a_gpu(app):
+    # Instantiate the scene without asking the Qt renderer to draw a model.
+    engine = QQmlEngine()
+    component = QQmlComponent(engine, QUrl.fromLocalFile(str(pane.VIEWPORT_QML)))
+    root = component.create()
+
+    # The empty viewport starts white and has no framed board.
+    assert root is not None, [error.toString() for error in component.errors()]
+    assert root.property("color").name() == "#ffffff"
+    assert not root.property("framed")
 
 
 def test_controls_panel_discovers_new_section(app, monkeypatch, tmp_path):
@@ -32,11 +46,15 @@ def test_controls_panel_discovers_new_section(app, monkeypatch, tmp_path):
         "Render",
         "Engine",
         "Color Scheme",
+        "Background",
+        "Hex Color",
+        "",
+        "Texture",
         "Resolution",
         "Aspect Ratio",
     ]
 
-    # Keep the presets and guide in Viewport and all three selectors in Render.
+    # Keep the camera presets and guide in Viewport and the export selectors in Render.
     viewport_section = labels[1].parentWidget()
     render_section = labels[2].parentWidget()
     assert len(viewport_section.findChildren(QPushButton)) == 4
@@ -107,7 +125,7 @@ def test_render_frame_follows_aspect_ratio_and_viewport_size(app, tmp_path):
     view.load_model(tmp_path / "unused.glb")
     panel = ControlsPanel(lambda: view, None, Event())
     panel.set_ready(None)
-    engine, _, resolution, ratio = panel.findChildren(QComboBox)
+    engine, _, _, _, resolution, ratio = panel.findChildren(QComboBox)
     checkbox = panel.findChild(QCheckBox)
     try:
         # The overlay starts hidden and the default guide is portrait.

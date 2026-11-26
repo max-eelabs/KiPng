@@ -11,8 +11,10 @@ from PySide6.QtQuick3D import QQuick3DObject
 from PySide6.QtQuickWidgets import QQuickWidget
 
 from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
+from ...contracts.background import DEFAULT_BACKGROUND, WHITE, BackgroundSettings, BackgroundTexture
 from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
 from ...contracts.render import DEFAULT_OUTPUT_SIZE, RenderEngine
+from .background import BackgroundImageProvider
 from .colors import layer_colors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
@@ -30,9 +32,11 @@ class BoardViewport(QQuickWidget):
         super().__init__()
         self.setClearColor(QColor("white"))
         self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
+        self.engine().addImageProvider("backdrop", BackgroundImageProvider())
         self.sceneGraphError.connect(self.show_graphics_error)
         self.board_materials: list[tuple[QQuick3DObject, str]] = []
         self.color_scheme = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME]
+        self.background = DEFAULT_BACKGROUND
         self.output_size = DEFAULT_OUTPUT_SIZE
         self.render_engine = RenderEngine.RAY_TRACING
         self.render_frame_visible = False
@@ -56,6 +60,7 @@ class BoardViewport(QQuickWidget):
         self.set_output_size(self.output_size)
         self.show_render_frame(self.render_frame_visible)
         scene.setProperty("captureMode", capture)
+        self.set_background(self.background)
         if not capture:
             sources = [QUrl.fromLocalFile(str(path)) for path in sorted(FEATURES_DIR.glob("*.qml"))]
             scene.setProperty("featureSources", sources)
@@ -82,6 +87,23 @@ class BoardViewport(QQuickWidget):
     def fit_board(self) -> None:
         """Center and fit the board using the viewport's current size."""
         self.rootObject().fitBoard()
+
+    def set_background(self, background: BackgroundSettings) -> None:
+        """Update the live backdrop while retaining settings before a scene is loaded."""
+        self.background = background
+        scene = self.rootObject()
+        if scene is None:
+            return
+
+        pattern = QUrl()
+        texture = background.effective_texture
+        if background.color is None:
+            pattern = QUrl("image://backdrop/checker")
+        elif texture is not BackgroundTexture.NONE:
+            pattern = QUrl(f"image://backdrop/{texture.value}/{background.color[1:]}")
+        scene.setProperty("backgroundColor", QColor(background.color or WHITE))
+        scene.setProperty("backgroundPattern", pattern)
+        scene.setProperty("backgroundTextured", texture is not BackgroundTexture.NONE)
 
     def set_output_size(self, size: tuple[int, int]) -> None:
         """Update the output dimensions and the viewport guide's aspect ratio."""

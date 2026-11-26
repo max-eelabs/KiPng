@@ -5,8 +5,8 @@ from threading import Event
 from unittest.mock import Mock
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, Signal
-from PySide6.QtGui import QColor, QImage
+from PySide6.QtCore import QObject, Qt, QThread, Signal
+from PySide6.QtGui import QColor, QImage, QPainter
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QComboBox
 
@@ -42,8 +42,11 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
         def start(self):
             # Only the GUI thread may capture the viewport.
             assert QThread.currentThread() == app.thread()
-            image = QImage(1080, 1440, QImage.Format.Format_RGB32)
-            image.fill(QColor("blue"))
+            image = QImage(1080, 1440, QImage.Format.Format_RGBA8888_Premultiplied)
+            image.fill(Qt.GlobalColor.transparent)
+            with QPainter(image) as painter:
+                painter.fillRect(10, 10, 20, 20, QColor("blue"))
+                painter.fillRect(30, 30, 20, 20, QColor(0, 0, 0, 76))
             self.captured.emit(image)
 
         def release(self):
@@ -53,14 +56,16 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
     ray_tracer = Mock()
     panel = ControlsPanel(lambda: viewport, ray_tracer, Event())
     panel.set_ready(BoardSnapshot("board", tmp_path, "project"))
-    engine, palette, _, aspect_ratio = panel.findChildren(QComboBox)
+    engine, palette, background, _, _, aspect_ratio = panel.findChildren(QComboBox)
     controls = panel.render_controls
     try:
         # Switch engines, export one PNG, and wait for the save worker.
         engine.setCurrentText("Viewport")
         palette.setCurrentText("Blue")
+        background.setCurrentText("Transparent")
         aspect_ratio.setCurrentText("3:4")
         controls.button.click()
+        background.setCurrentText("Warm Stone")
         for _ in range(100):
             if controls.button.isEnabled():
                 break
@@ -73,7 +78,10 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
         (png,) = tmp_path.glob("*.png")
         with Image.open(png) as image:
             assert image.size == (1080, 1440)
-            assert image.getpixel((0, 0)) == (0, 0, 255)
+            assert image.mode == "RGBA"
+            assert image.getpixel((0, 0)) == (0, 0, 0, 0)
+            assert image.getpixel((10, 10)) == (0, 0, 255, 255)
+            assert image.getpixel((30, 30)) == (0, 0, 0, 76)
     finally:
         panel.shutdown()
         viewport.close()

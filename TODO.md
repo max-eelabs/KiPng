@@ -1,4 +1,4 @@
-- [ ] Add an ability to select background from a fixed set of colors. Background should be white (default), transparent, and then set of mild colors with optional procedural fabric texture (like small grain noise) so it looks expensive
+- [x] Add selectable backgrounds with white, transparent, muted presets, custom hex colors, and procedural textures.
 - [ ] Add 2 draggable controls for adjusting light position which will affect shadow and ray tracing render 
 - [ ] Add Icon for the plugin
 - [ ] Fix dashes change long to short on window headers etc
