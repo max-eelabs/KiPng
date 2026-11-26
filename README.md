@@ -1,6 +1,8 @@
 # KiPng
 
-KiPng adds a **3D Preview** button to the KiCad PCB Editor toolbar. It opens an interactive view of the current board, including unsaved edits, against a white background. Drag to orbit all the way around the board and inspect either side, hold Ctrl and drag to pan, and scroll to zoom. Close the window and click the button again to pick up the latest edits.
+<img src="plugin/kipng-logo.svg" alt="KiPng Kp logo" width="80" height="80">
+
+KiPng adds a **3D Preview** button to the KiCad PCB Editor toolbar. It opens an interactive view of the current board, including unsaved edits, against a white background. Drag to orbit all the way around the board and inspect either side, hold Ctrl and drag to pan, and scroll to zoom. Choose **File > Reload Board** to pick up the latest edits without closing the preview. The File menu also lets you render, restore the default camera and render settings, or exit.
 
 In the **Render** section, use **Color Scheme** to preview green, red, white, black, blue, purple, or yellow solder mask. The palette updates both board faces while keeping the current camera. The exported PNG uses the selected palette.
 

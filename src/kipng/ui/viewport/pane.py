@@ -42,6 +42,16 @@ class BoardViewport(QQuickWidget):
         self.render_engine = RenderEngine.RAY_TRACING
         self.render_frame_visible = False
 
+    def reset_settings(self) -> None:
+        """Restore the startup render settings and refit the default camera."""
+        self.render_engine = RenderEngine.RAY_TRACING
+        self.set_color_scheme(COLOR_SCHEMES[DEFAULT_COLOR_SCHEME])
+        self.set_background(DEFAULT_BACKGROUND)
+        self.set_shadow(DEFAULT_SHADOW)
+        self.set_output_size(DEFAULT_OUTPUT_SIZE)
+        self.show_render_frame(False)
+        self.set_camera_view(FRONT_PITCH, FRONT_YAW, True)
+
     def show_graphics_error(self, _error, message: str) -> None:
         self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
 

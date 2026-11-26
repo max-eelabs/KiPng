@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+    <title id="title">KiPng logo</title>
+    <rect width="128" height="128" rx="14" fill="#12486B"/>
+    <g fill="#FFFFFF" transform="matrix(1 0 -0.2 1 13 0)">
+        <path d="M22 0h14v57l24-29h17L51 61l24 35H58L36 65v31H22z"/>
+        <path fill-rule="evenodd"
+            d="M80 54h11v4c4-4 8-6 13-6 10 0 16 8 16 20 0 13-7 22-18 22-5 0-8-1-11-4v38H80z
+               m11 19c0 7 3 11 9 11s9-4 9-12c0-7-3-10-9-10s-9 4-9 11z"/>
+    </g>
+    <circle cx="102" cy="34" r="9" fill="#7EAE1C"/>
+</svg>

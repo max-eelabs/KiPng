@@ -10,7 +10,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from threading import Event, Thread
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QFileDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
@@ -22,6 +22,8 @@ from ..viewport.render import ViewportCapture, save_viewport_render
 
 
 class RenderControls(QWidget):
+    busy_changed = Signal()
+
     def __init__(self, renderer: ImageRenderer, cancelled: Event) -> None:
         super().__init__()
         self.renderer = renderer
@@ -41,8 +43,12 @@ class RenderControls(QWidget):
         layout.addWidget(self.status)
         layout.addWidget(self.button, alignment=Qt.AlignmentFlag.AlignRight)
 
+    @property
+    def busy(self) -> bool:
+        return self.worker is not None or self.capture is not None
+
     def start(self, snapshot: BoardSnapshot, view: BoardViewport) -> None:
-        if self.worker is not None or self.capture is not None or self.cancelled.is_set():
+        if self.busy or self.cancelled.is_set():
             return
 
         camera = view.capture_camera()
@@ -76,6 +82,7 @@ class RenderControls(QWidget):
                 Qt.ConnectionType.QueuedConnection,
             )
             self.capture.failed.connect(self.capture_failed, Qt.ConnectionType.QueuedConnection)
+            self.busy_changed.emit()
             self.capture.start()
             return
 
@@ -97,6 +104,7 @@ class RenderControls(QWidget):
         self.worker = Thread(target=self.render, args=(render,), name="board-render")
         self.worker.start()
         self.poll.start()
+        self.busy_changed.emit()
 
     def save_capture(
         self,
@@ -146,6 +154,7 @@ class RenderControls(QWidget):
         self.shutdown()
         self.button.setText("Render")
         self.button.setEnabled(True)
+        self.busy_changed.emit()
         if isinstance(result, str):
             QMessageBox.warning(self, "Render failed", result)
             return

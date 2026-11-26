@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugin"
@@ -23,8 +24,15 @@ def test_manifest_points_to_packaged_entrypoint_and_icons():
     assert action["show-button"] and action["scopes"] == ["pcb"]
 
     # Resolve the launcher and both theme icons relative to the manifest.
-    for name in (action["entrypoint"], *action["icons-light"], *action["icons-dark"]):
-        assert (PLUGIN / name).is_file()
+    assert (PLUGIN / action["entrypoint"]).is_file()
+    for name in (*action["icons-light"], *action["icons-dark"]):
+        with Image.open(PLUGIN / name) as icon:
+            assert (icon.format, icon.size, icon.mode) == ("PNG", (24, 24), "RGBA")
+    assert (PLUGIN / "icon-light.png").read_bytes() == (PLUGIN / "icon-dark.png").read_bytes()
+
+    # Windows can choose a matching bitmap for its current taskbar scale.
+    with Image.open(PLUGIN / "kipng-logo.ico") as icon:
+        assert {(16, 16), (24, 24), (32, 32), (48, 48), (256, 256)} <= icon.ico.sizes()
 
 
 def test_source_files_stay_within_250_lines():
@@ -96,8 +104,23 @@ def test_install_and_upgrade_copy_runtime_without_private_files(tmp_path):
 
     # Import from the installed package rather than the workspace or pytest path.
     launch_env = {key: value for key, value in env.items() if key != "PYTHONPATH"}
+    launch_env["QT_QPA_PLATFORM"] = "offscreen"
+    verify_application = """
+import preview
+from kipng.app import create_application
+from PySide6.QtWidgets import QDialog, QWidget
+
+assert callable(preview.main)
+app = create_application()
+window = QWidget()
+dialog = QDialog(window)
+for widget in (window, dialog):
+    icon = widget.windowIcon()
+    assert icon.cacheKey() == app.windowIcon().cacheKey()
+    assert not icon.pixmap(48, 48).isNull()
+"""
     result = subprocess.run(
-        [sys.executable, "-B", "-c", "import preview; assert callable(preview.main)"],
+        [sys.executable, "-B", "-c", verify_application],
         cwd=target,
         env=launch_env,
         stdin=subprocess.DEVNULL,
