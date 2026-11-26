@@ -12,6 +12,7 @@ from ..contracts import BoardSnapshot, BoardSource, PreviewCancelled, PreviewErr
 from .board import KiCadBoardSource, stage_board
 from .cli import find_cli, run_cli
 from .glb import prepare_preview_materials
+from .vrml import footprint_materials
 
 EXPORT_TIMEOUT_SECONDS = 120
 
@@ -58,7 +59,13 @@ def export_snapshot_model(snapshot: BoardSnapshot, output: Path, cancelled: Even
                 plots = export_paste_plots(cli, board_path, Path(directory), cancelled)
                 if cancelled.is_set():
                     raise PreviewCancelled
-                prepare_preview_materials(output, board_name=board_path.stem, paste_plots=plots)
+                materials = footprint_materials(snapshot, cancelled)
+                prepare_preview_materials(
+                    output,
+                    board_name=board_path.stem,
+                    paste_plots=plots,
+                    component_materials=materials,
+                )
         except (OSError, ValueError, struct.error) as error:
             raise PreviewError(f"Could not read the exported board model.\n\n{error}") from error
 

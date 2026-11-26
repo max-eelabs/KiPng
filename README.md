@@ -17,7 +17,9 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 
 3. Enable **Enable KiCad API** in **Preferences → Plugins**, restart KiCad, and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
 
-The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project. VRML-only footprint models require a matching STEP or IGES file to appear in the GLB.
+The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
+
+When the GLB includes a VRML footprint model, KiPng can recover source transparency for the live preview and Viewport PNGs. This works when the footprint has one readable VRML model and each affected GLB material color identifies a single opacity in that model.
 
 In **Render**, choose **Ray Tracing** for KiCad's raytraced lighting or **Viewport** for the Qt 3D preview's appearance. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Ray Tracing at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
 
