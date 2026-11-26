@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Adjust preview materials while keeping the exported model geometry intact."""
+"""Adjust preview materials while preserving the original model geometry."""
 
 import json
 import os
@@ -10,10 +10,14 @@ import struct
 from math import isclose
 from pathlib import Path
 
+from .paste import add_paste_surfaces
+
 LED_HOUSING_RGB = (0.778, 0.770, 0.626)
 
 
-def prepare_preview_materials(model: Path) -> None:
+def prepare_preview_materials(
+    model: Path, *, board_name: str = "", paste_plots: dict[str, Path] | None = None
+) -> None:
     updated = model.with_suffix(".tmp")
     with model.open("rb") as source:
         magic, version, length = struct.unpack("<4sII", source.read(12))
@@ -27,26 +31,46 @@ def prepare_preview_materials(model: Path) -> None:
         ):
             raise ValueError("Expected a GLB 2.0 scene.")
         scene = json.loads(source.read(chunk_length))
-        if not adjust_materials(scene.get("materials", [])):
+        mask_materials = {
+            primitive["material"]
+            for mesh in scene.get("meshes", [])
+            if mesh.get("name") == f"{board_name}_soldermask"
+            for primitive in mesh["primitives"]
+            if "material" in primitive
+        }
+        changed = adjust_materials(scene.get("materials", []), mask_materials)
+        binary_start = source.tell()
+        extra = b""
+        if paste_plots:
+            binary_size, binary_tag = struct.unpack("<I4s", source.read(8))
+            # KiCad exports a single embedded buffer in a GLB BIN chunk.
+            if binary_tag != b"BIN\0" or binary_start + 8 + binary_size != length:
+                raise ValueError("Expected an embedded KiCad GLB buffer.")
+            extra = add_paste_surfaces(scene, board_name, paste_plots, binary_size)
+            if extra:
+                scene["buffers"][0]["byteLength"] = binary_size + len(extra)
+            else:
+                source.seek(binary_start)
+        if not changed and not extra:
             return
 
-        # Only the JSON chunk changes. Stream the remaining GLB chunks verbatim.
         data = json.dumps(scene, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         data += b" " * (-len(data) % 4)
         with updated.open("xb") as target:
-            header = struct.pack(
-                "<4sIII4s", magic, version, length - chunk_length + len(data), len(data), chunk_type
-            )
-            target.write(header)
+            total_size = length - chunk_length + len(data) + len(extra)
+            target.write(struct.pack("<4sIII4s", magic, version, total_size, len(data), chunk_type))
             target.write(data)
+            if extra:
+                target.write(struct.pack("<I4s", binary_size + len(extra), b"BIN\0"))
             shutil.copyfileobj(source, target)
+            target.write(extra)
     updated.replace(model)
 
 
-def adjust_materials(materials: list[dict]) -> bool:
+def adjust_materials(materials: list[dict], mask_materials: set[int]) -> bool:
     changed = False
     copper_rgb = (0.7, 0.61, 0.0)
-    for material in materials:
+    for index, material in enumerate(materials):
         pbr = material.get("pbrMetallicRoughness")
         if not pbr or "metallicRoughnessTexture" in pbr:
             continue
@@ -54,8 +78,16 @@ def adjust_materials(materials: list[dict]) -> bool:
         metalness = pbr.get("metallicFactor")
         roughness = pbr.get("roughnessFactor", 1)
         color = pbr.get("baseColorFactor")
-        # Make KiCad's blended silkscreen opaque so it always sits above the solder mask.
+        # Let a little more copper show through KiCad's default mask on both faces.
         if (
+            index in mask_materials
+            and material.get("alphaMode") == "BLEND"
+            and color
+            and isclose(color[3], 0.83, abs_tol=1e-6)
+        ):
+            color[3] = 0.77
+        # Make KiCad's blended silkscreen opaque so it always sits above the solder mask.
+        elif (
             metalness == 0
             and isclose(roughness, 0.9, abs_tol=1e-6)
             and color

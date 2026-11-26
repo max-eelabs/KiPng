@@ -69,6 +69,41 @@ def test_preview_materials_keep_geometry_and_unify_copper(tmp_path, write_glb):
     assert list(tmp_path.iterdir()) == [model]
 
 
+def test_preview_lets_copper_show_through_the_default_mask(tmp_path, write_glb):
+    # Give both solder-mask meshes and an unrelated component the same starting opacity.
+    names = ["board_soldermask", "board_soldermask", "component"]
+    materials = [
+        {
+            "alphaMode": "BLEND",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [0.08, 0.2, 0.14, 0.83],
+                "metallicFactor": 0,
+                "roughnessFactor": 0.6,
+            },
+        }
+        for _ in names
+    ]
+    meshes = [
+        {"name": name, "primitives": [{"material": index}]} for index, name in enumerate(names)
+    ]
+    model = tmp_path / "board.glb"
+    write_glb(model, materials, meshes)
+
+    # Reduce only the mask opacity, preserving its tint and blend mode.
+    prepare_preview_materials(model, board_name="board")
+    data = model.read_bytes()
+    size = struct.unpack_from("<I", data, 12)[0]
+    updated = json.loads(data[20 : 20 + size])["materials"]
+    for material in updated[:2]:
+        assert material["alphaMode"] == "BLEND"
+        assert material["pbrMetallicRoughness"]["baseColorFactor"] == [0.08, 0.2, 0.14, 0.77]
+    assert updated[2] == materials[2]
+
+    # Applying the same preview adjustment twice keeps the opacity stable.
+    prepare_preview_materials(model, board_name="board")
+    assert model.read_bytes() == data
+
+
 def test_invalid_glb_is_rejected_without_overwriting_it(tmp_path):
     # Write a GLB header with an unsupported version.
     model = tmp_path / "invalid.glb"

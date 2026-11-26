@@ -11,7 +11,13 @@ from threading import Event, Thread
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QFileDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
-from ..contracts import BoardSnapshot, ImageRenderer, PreviewCancelled, PreviewError, ViewportCamera
+from ...contracts import (
+    BoardSnapshot,
+    ImageRenderer,
+    PreviewCancelled,
+    PreviewError,
+    ViewportCamera,
+)
 
 
 class RenderControls(QWidget):
@@ -29,7 +35,7 @@ class RenderControls(QWidget):
         self.status.hide()
         self.button = QPushButton("Render")
         layout = QVBoxLayout(self)
-        layout.addStretch(1)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.status)
         layout.addWidget(self.button, alignment=Qt.AlignmentFlag.AlignRight)
 
