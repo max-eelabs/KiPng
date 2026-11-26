@@ -1,0 +1,111 @@
+# Copyright (c) 2026 Maxim Pavlov
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+from contextlib import nullcontext
+from threading import Event
+from types import SimpleNamespace
+
+import pytest
+
+from kipng.contracts import BoardSnapshot, PreviewCancelled, PreviewError
+from kipng.export import board, exporter
+
+
+def test_ipc_uses_live_board_text_and_preferred_cli(monkeypatch, tmp_path):
+    # Supply an edited board and the CLI path from the same editor instance.
+    project = SimpleNamespace(path=str(tmp_path), name="project")
+    open_board = SimpleNamespace(
+        get_as_string=lambda: "(kicad_pcb unsaved-text)",
+        document=SimpleNamespace(project=project),
+    )
+    editor = SimpleNamespace(
+        get_board=lambda: open_board,
+        get_kicad_binary_path=lambda name: f"alternative/{name}.exe",
+    )
+    monkeypatch.setattr(board, "KiCad", lambda timeout_ms: editor)
+
+    # Capture the live text and enough project information to export it.
+    snapshot = board.KiCadBoardSource().read(Event())
+    assert snapshot == BoardSnapshot(
+        "(kicad_pcb unsaved-text)", tmp_path, "project", "alternative/kicad-cli.exe"
+    )
+
+
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        pytest.param("success", nullcontext(), id="success"),
+        pytest.param("command", pytest.raises(PreviewError, match="Export failed"), id="cli-error"),
+        pytest.param("cancelled", pytest.raises(PreviewCancelled), id="cancelled"),
+        pytest.param(
+            "invalid",
+            pytest.raises(PreviewError, match="Could not read the exported"),
+            id="invalid-model",
+        ),
+    ],
+)
+def test_export_stages_project_and_cleans_up(monkeypatch, tmp_path, write_glb, outcome, expected):
+    # Keep the saved board and project beside the temporary export files.
+    project_dir = tmp_path / "PCB á"
+    project_dir.mkdir()
+    original_board = project_dir / "design.kicad_pcb"
+    original_board.write_text("last saved board", encoding="utf-8")
+    original_project = project_dir / "design.kicad_pro"
+    original_project.write_bytes(b"project settings")
+
+    # Supply a live snapshot with different text from the saved board.
+    cancellation = Event()
+    output = tmp_path / "preview.glb"
+    cli = tmp_path / "kicad-cli.exe"
+    snapshot = BoardSnapshot("live board", project_dir, "design", str(cli))
+    reader = SimpleNamespace(read=lambda cancelled: snapshot)
+    monkeypatch.setattr(exporter, "find_cli", lambda preferred, cancelled: cli)
+
+    def run_export_command(args, cancelled, timeout):
+        # Check the arguments, timeout, and cancellation event passed to KiCad.
+        assert args[:4] == [str(cli), "pcb", "export", "glb"]
+        assert args[4:6] == ["--output", str(output)]
+        assert "--subst-models" in args and "--include-silkscreen" in args
+        assert cancelled is cancellation and timeout == 120
+
+        # Verify that KiCad sees the unsaved board and a copy of its project settings.
+        staged = next(project_dir.glob("kipng-preview-*.kicad_pcb"))
+        assert args[-1] == str(staged)
+        assert staged.read_text(encoding="utf-8") == "live board"
+        assert staged.with_suffix(".kicad_pro").read_bytes() == b"project settings"
+
+        # Simulate the local settings that KiCad can leave next to a board.
+        staged.with_suffix(".kicad_prl").write_bytes(b"CLI settings")
+
+        # Return the selected export outcome.
+        if outcome == "command":
+            raise PreviewError("Export failed")
+        if outcome == "cancelled":
+            cancelled.set()
+        elif outcome == "invalid":
+            output.write_bytes(b"truncated")
+        else:
+            write_glb(output)
+
+    # Run the exporter and check the expected result for this case.
+    monkeypatch.setattr(exporter, "run_cli", run_export_command)
+    with expected:
+        exporter.export_board_model(output, cancellation, source=reader)
+    if outcome == "success":
+        assert output.read_bytes().startswith(b"glTF")
+
+    # Cleanup always removes the staged files and preserves the original project.
+    assert set(project_dir.iterdir()) == {original_board, original_project}
+    assert original_board.read_text(encoding="utf-8") == "last saved board"
+    assert original_project.read_bytes() == b"project settings"
+
+
+def test_unsaved_project_can_stage_in_fallback_directory(tmp_path):
+    # Stage a board with no project directory.
+    snapshot = BoardSnapshot("new board", None, "")
+    with board.stage_board(snapshot, tmp_path) as staged:
+        assert staged.parent == tmp_path
+        assert staged.read_text(encoding="utf-8") == "new board"
+
+    # The fallback directory is empty after the preview closes the snapshot.
+    assert not list(tmp_path.iterdir())

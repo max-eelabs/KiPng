@@ -1,0 +1,21 @@
+{
+  "$schema": "https://go.kicad.org/api/schemas/v1",
+  "identifier": "org.kipng.preview",
+  "name": "KiPng",
+  "description": "Show a 3D preview of the current PCB.",
+  "runtime": {
+    "type": "python"
+  },
+  "actions": [
+    {
+      "identifier": "preview",
+      "name": "3D Preview",
+      "description": "Open the current board in an interactive 3D view.",
+      "scopes": ["pcb"],
+      "entrypoint": "preview.py",
+      "show-button": true,
+      "icons-light": ["icon-light.png"],
+      "icons-dark": ["icon-dark.png"]
+    }
+  ]
+}
