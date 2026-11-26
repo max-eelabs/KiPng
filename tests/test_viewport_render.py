@@ -26,7 +26,7 @@ def test_viewport_engine_captures_selected_settings_and_saves_png(app, monkeypat
     viewport = BoardViewport()
     viewport.setSource(QUrl.fromLocalFile(str(VIEWPORT_QML)))
     camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07)
-    monkeypatch.setattr(viewport, "capture_camera", lambda: camera)
+    monkeypatch.setattr(viewport, "capture_camera", lambda *_: camera)
     monkeypatch.setattr(render.QFileDialog, "getExistingDirectory", lambda *_: str(tmp_path))
     released = []
 

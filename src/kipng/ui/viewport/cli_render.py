@@ -12,7 +12,7 @@ from threading import Event
 from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtWidgets import QApplication
 
-from ...contracts import BoardSnapshot, PreviewCancelled, PreviewError
+from ...contracts import BoardSnapshot, PcbGeometry, PreviewCancelled, PreviewError
 from ...contracts.options import RenderOptions
 from ...export.exporter import export_snapshot_model
 from .render import RenderSurface
@@ -21,17 +21,17 @@ from .render import RenderSurface
 @contextmanager
 def open_render_surface(
     snapshot: BoardSnapshot, settings: RenderOptions, cancelled: Event
-) -> Iterator[RenderSurface]:
+) -> Iterator[tuple[RenderSurface, PcbGeometry | None]]:
     app = QApplication.instance() or QApplication(["KiPng"])
     with TemporaryDirectory(prefix="kipng-cli-") as directory:
         model = Path(directory) / "board.glb"
-        export_snapshot_model(snapshot, model, cancelled)
+        geometry = export_snapshot_model(snapshot, model, cancelled)
         surface = RenderSurface(
             model, settings.palette, settings.output_size, shadow=settings.lighting
         )
         try:
             wait_for_model(surface, cancelled)
-            yield surface
+            yield surface, geometry
         finally:
             surface.release()
             app.processEvents()

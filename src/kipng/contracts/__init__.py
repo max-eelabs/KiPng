@@ -26,12 +26,21 @@ class PreviewCancelled(Exception):
 
 
 @dataclass(frozen=True)
+class PcbGeometry:
+    """PCB body center and longest planar extent in GLB metres."""
+
+    center: tuple[float, float, float]
+    span: float
+
+
+@dataclass(frozen=True)
 class BoardSnapshot:
     text: str
     project_dir: Path | None
     project_name: str
     preferred_cli: str | None = None
     board_path: Path | None = None
+    pcb_geometry: PcbGeometry | None = None
 
 
 class BoardSource(Protocol):
@@ -57,6 +66,8 @@ class ViewportCamera:
     pan_y: float
     board_span: float
     frame_half_width: float
+    # Assembly pivot relative to the PCB body center, in GLB axes and metres.
+    pivot: tuple[float, float, float] | None = None
 
 
 class ImageRenderer(Protocol):

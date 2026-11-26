@@ -180,9 +180,9 @@ def test_copy_cli_captures_the_effective_view(app, monkeypatch, tmp_path):
     board = tmp_path / "Robin's PCB.kicad_pcb"
     board.touch()
     snapshot = BoardSnapshot("board", tmp_path, board.stem, board_path=board)
-    camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07)
+    camera = ViewportCamera(-55, 40, 0.2, -0.01, 0.02, 0.1, 0.07, pivot=(0, 0.025, -0.001))
     monkeypatch.setattr(BoardViewport, "load_model", load_scene)
-    monkeypatch.setattr(BoardViewport, "capture_camera", lambda _: camera)
+    monkeypatch.setattr(BoardViewport, "capture_camera", lambda *_: camera)
     preview = window.PreviewWindow(tmp_path / "board.glb", lambda *_: snapshot, Mock())
     preview.start()
     try:
@@ -208,7 +208,7 @@ def test_copy_cli_captures_the_effective_view(app, monkeypatch, tmp_path):
         preview.menu_bar.copy_cli_action.trigger()
         command = app.clipboard().text()
         expected = (
-            "--camera=-55,40,0.2,-0.01,0.02,0.1,0.07",
+            "--camera=-55,40,0.2,-0.01,0.02,0.1,0.07,0,0.025,-0.001",
             "--engine=viewport",
             "--color-scheme=purple",
             "--background=#123456",

@@ -51,7 +51,7 @@ class RenderControls(QWidget):
         if self.busy or self.cancelled.is_set():
             return
 
-        camera = view.capture_camera()
+        camera = view.capture_camera(snapshot.pcb_geometry)
         color_scheme = view.color_scheme
         background = view.background
         shadow = view.shadow

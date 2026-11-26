@@ -99,7 +99,7 @@ def test_copied_posix_command_preserves_shell_metacharacters():
     launcher = Path("/KiPng checkout/plugin/render.py")
     board = Path("/projects/Robin's ${board}.kicad_pcb")
     snapshot = BoardSnapshot("", board.parent, board.stem, board_path=board)
-    camera = ViewportCamera(-90, 0, 1, 0, 0, 1, 1)
+    camera = ViewportCamera(-90, 0, 1, 0, 0, 1, 1, pivot=(0, 0.025, -0.001))
     settings = RenderOptions(background="#123456", light_x=-25)
 
     # The POSIX shell and the CLI read back the same paths, pose, and control values.

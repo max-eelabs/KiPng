@@ -81,7 +81,7 @@ Use `--camera=PITCH,YAW,DISTANCE,PAN_X,PAN_Y,BOARD_SPAN,FRAME_HALF_WIDTH` for an
 | `BOARD_SPAN` | Longest board-plane extent in GLB units. |
 | `FRAME_HALF_WIDTH` | Half the horizontal width of the output crop at the board depth, in GLB units. |
 
-All seven values must be finite. Distance, board span, and frame half-width must be positive. Use **File > Copy CLI** to capture these values from the preview.
+All values must be finite. Distance, board span, and frame half-width must be positive. **File > Copy CLI** captures these values from the preview and appends `PIVOT_X,PIVOT_Y,PIVOT_Z` when the PCB body bounds are available. This optional vector gives the assembly center relative to the PCB center in GLB axes and metres. It aligns Ray Tracing with the preview for boards with tall or overhanging parts. Seven-value commands remain valid.
 
 The Viewport engine always uses Qt Quick 3D and needs a working graphics session. Automatic camera fitting with `--view` also uses Qt Quick 3D. Ray tracing with an explicit `--camera` can run headless.
 

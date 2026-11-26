@@ -17,11 +17,14 @@ from .contracts.render import CAMERA_PRESETS, RenderEngine
 
 def parse_camera(value: str) -> ViewportCamera:
     try:
-        camera = ViewportCamera(*(float(part) for part in value.split(",")))
-    except (TypeError, ValueError) as error:
-        raise ArgumentTypeError("expected seven comma-separated numbers") from error
-    if not all(isfinite(number) for number in vars(camera).values()):
+        values = [float(part) for part in value.split(",")]
+    except ValueError as error:
+        raise ArgumentTypeError("expected seven or ten comma-separated numbers") from error
+    if len(values) not in (7, 10):
+        raise ArgumentTypeError("expected seven or ten comma-separated numbers")
+    if not all(isfinite(number) for number in values):
         raise ArgumentTypeError("camera values must be finite")
+    camera = ViewportCamera(*values[:7], pivot=tuple(values[7:]) if len(values) == 10 else None)
     if min(camera.distance, camera.board_span, camera.frame_half_width) <= 0:
         raise ArgumentTypeError("distance, board span, and frame half-width must be positive")
     return camera
@@ -46,7 +49,10 @@ def create_parser() -> ArgumentParser:
         "--camera",
         type=parse_camera,
         metavar="POSE",
-        help="Use --camera=PITCH,YAW,DISTANCE,PAN_X,PAN_Y,BOARD_SPAN,FRAME_HALF_WIDTH.",
+        help=(
+            "Use --camera=PITCH,YAW,DISTANCE,PAN_X,PAN_Y,BOARD_SPAN,FRAME_HALF_WIDTH"
+            "[,PIVOT_X,PIVOT_Y,PIVOT_Z]."
+        ),
     )
     return parser
 
@@ -70,10 +76,10 @@ def render(args: Namespace, cancelled: Event) -> Path:
         from .ui.viewport.cli_render import open_render_surface
 
         preset = next(tuple(pose) for label, *pose in CAMERA_PRESETS if slug(label) == args.view)
-        with open_render_surface(snapshot, settings, cancelled) as surface:
+        with open_render_surface(snapshot, settings, cancelled) as (surface, geometry):
             if camera is None:
                 surface.set_camera_view(*preset)
-                camera = surface.capture_camera()
+                camera = surface.capture_camera(geometry)
             if engine is RenderEngine.VIEWPORT:
                 from .ui.viewport.render import save_viewport_render
 

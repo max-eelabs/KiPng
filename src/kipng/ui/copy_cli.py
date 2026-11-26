@@ -39,6 +39,7 @@ def render_command(
             camera.pan_y,
             camera.board_span,
             camera.frame_half_width,
+            *(camera.pivot or ()),
         )
     )
     args = [str(python), str(launcher), str(snapshot.board_path), f"--camera={pose}"]
@@ -73,5 +74,6 @@ def copy_cli(view: BoardViewport | None, snapshot: BoardSnapshot | None) -> None
     settings = RenderOptions.from_render(
         view.render_engine, view.color_scheme, view.output_size, view.background, view.shadow
     )
-    command = render_command(python, launcher, snapshot, view.capture_camera(), settings)
+    camera = view.capture_camera(snapshot.pcb_geometry)
+    command = render_command(python, launcher, snapshot, camera, settings)
     QApplication.clipboard().setText(command)
