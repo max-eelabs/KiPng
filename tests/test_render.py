@@ -40,6 +40,43 @@ def test_camera_tracks_orbit_zoom_and_pan():
     assert wrapped_args == args
 
 
+@pytest.mark.parametrize("size", [(1440, 1080), (1080, 1440)], ids=["4-by-3", "3-by-4"])
+def test_raytrace_calibrates_assembly_pivot_and_lens(size):
+    # Capture the same camera distance with a crop fitted to each aspect ratio.
+    width, height = size
+    camera = ViewportCamera(
+        -82,
+        56,
+        0.128,
+        0.002,
+        -0.003,
+        0.04826,
+        0.049 * width / height,
+        pivot=(0.001, 0.02444, -0.002),
+    )
+    canvas_width, canvas_height, scale = render.raytrace_canvas(camera, size)
+    args = render.camera_arguments(camera, canvas_height, width, exact_distance=True)
+
+    # KiCad receives the actual camera distance and a Z-up, centimetre offset.
+    assert args[args.index("--pivot") + 1] == "0.1,0.2,2.444"
+    assert render.vector_argument(-0.0000005, 0, 2.444) == "-0.0000005,0,2.444"
+    assert float(args[args.index("--zoom") + 1]) == pytest.approx(16 / (0.128 * 12.8 / 0.04826))
+    assert scale > 0
+    assert canvas_width * scale >= width
+    assert scale * canvas_height / (2 * render.RAY_HALF_ANGLE_TANGENT) == pytest.approx(
+        width * camera.distance / (2 * camera.frame_half_width)
+    )
+
+    # Lens correction keeps an off-center marker on its intended side of the crop.
+    raw = Image.new("RGBA", (canvas_width, canvas_height))
+    center_x, center_y = canvas_width // 2, canvas_height // 2
+    raw.paste("green", (center_x + 60, center_y - 8, center_x + 80, center_y + 8))
+    normalized = render.match_focal_length(raw, size, scale)
+    framed = composite(normalized, size, shadow_settings=ShadowSettings(strength=0))
+    assert framed.getpixel((width // 2, height // 2))[3] == 0
+    assert framed.getpixel((width // 2 + round(70 * scale), height // 2))[3] == 255
+
+
 @pytest.mark.parametrize(
     ("output_size", "canvas_size"),
     [(DEFAULT_OUTPUT_SIZE, (2304, 3968)), ((2880, 2160), (3024, 2288))],

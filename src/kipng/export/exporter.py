@@ -4,14 +4,16 @@
 """Prepare a temporary GLB from the board open in the PCB Editor."""
 
 import struct
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Event
 
-from ..contracts import BoardSnapshot, BoardSource, PreviewCancelled, PreviewError
+from ..contracts import BoardSnapshot, BoardSource, PcbGeometry, PreviewCancelled, PreviewError
 from .board import KiCadBoardSource, stage_board
 from .cli import find_cli, run_cli
 from .glb import prepare_preview_materials
+from .vrml import footprint_materials
 
 EXPORT_TIMEOUT_SECONDS = 120
 
@@ -21,12 +23,14 @@ def export_board_model(
 ) -> BoardSnapshot:
     board_source = source if source is not None else KiCadBoardSource()
     snapshot = board_source.read(cancelled)
-    export_snapshot_model(snapshot, output, cancelled)
-    return snapshot
+    geometry = export_snapshot_model(snapshot, output, cancelled)
+    return replace(snapshot, pcb_geometry=geometry)
 
 
-def export_snapshot_model(snapshot: BoardSnapshot, output: Path, cancelled: Event) -> None:
-    """Write the preview GLB from an already captured board."""
+def export_snapshot_model(
+    snapshot: BoardSnapshot, output: Path, cancelled: Event
+) -> PcbGeometry | None:
+    """Write the preview GLB and return its PCB body bounds when available."""
     if cancelled.is_set():
         raise PreviewCancelled
     cli = find_cli(snapshot.preferred_cli, cancelled)
@@ -58,7 +62,13 @@ def export_snapshot_model(snapshot: BoardSnapshot, output: Path, cancelled: Even
                 plots = export_paste_plots(cli, board_path, Path(directory), cancelled)
                 if cancelled.is_set():
                     raise PreviewCancelled
-                prepare_preview_materials(output, board_name=board_path.stem, paste_plots=plots)
+                materials = footprint_materials(snapshot, cancelled)
+                return prepare_preview_materials(
+                    output,
+                    board_name=board_path.stem,
+                    paste_plots=plots,
+                    component_materials=materials,
+                )
         except (OSError, ValueError, struct.error) as error:
             raise PreviewError(f"Could not read the exported board model.\n\n{error}") from error
 

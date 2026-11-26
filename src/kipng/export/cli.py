@@ -3,6 +3,7 @@
 
 """Locate a KiCad 10.0 CLI and run commands with cancellation and time limits."""
 
+import logging
 import os
 import re
 import shutil
@@ -13,6 +14,8 @@ from time import monotonic
 
 from ..contracts import PreviewCancelled, PreviewError
 
+LOGGER = logging.getLogger(__name__)
+
 
 def run_cli(
     args: list[str], cancelled: Event, timeout: int, *, env: dict[str, str] | None = None
@@ -20,6 +23,7 @@ def run_cli(
     if cancelled.is_set():
         raise PreviewCancelled
 
+    LOGGER.debug("Starting subprocess %s with a %d-second timeout.", args[0], timeout)
     startup_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     with subprocess.Popen(
         args,
@@ -49,6 +53,7 @@ def run_cli(
 
     output = stdout.decode("utf-8", errors="replace").strip()
     errors = stderr.decode("utf-8", errors="replace").strip()
+    LOGGER.debug("KiCad CLI exited with code %d.", process.returncode)
     if process.returncode:
         details = (errors or output or f"Exit code {process.returncode}.")[-2000:]
         raise PreviewError(f"KiCad CLI could not complete the command.\n\n{details}")

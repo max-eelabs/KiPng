@@ -17,11 +17,13 @@ def app():
 
 @pytest.fixture
 def write_glb():
-    def write(path, materials=None, meshes=None):
+    def write(path, materials=None, meshes=None, *, nodes=None):
         # Pad the JSON chunk to the four-byte GLB boundary.
         scene = {"asset": {"version": "2.0"}, "materials": materials or []}
         if meshes is not None:
             scene["meshes"] = meshes
+        if nodes is not None:
+            scene["nodes"] = nodes
         data = json.dumps(scene).encode("utf-8")
         data += b" " * (-len(data) % 4)
 

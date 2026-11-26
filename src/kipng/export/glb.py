@@ -11,17 +11,23 @@ from copy import deepcopy
 from math import isclose
 from pathlib import Path
 
-from ..contracts import BOARD_MATERIAL_TAGS
+from ..contracts import BOARD_MATERIAL_TAGS, PcbGeometry
 from ..contracts.colors import PREVIEW_COPPER_RGB
+from .glb_transparency import restore_component_opacity
 from .paste import add_paste_surfaces
+from .vrml import SourceMaterial
 
 LED_HOUSING_RGB = (0.778, 0.770, 0.626)
 KICAD_COPPER_RGB = (0.7, 0.61, 0.0)
 
 
 def prepare_preview_materials(
-    model: Path, *, board_name: str = "", paste_plots: dict[str, Path] | None = None
-) -> None:
+    model: Path,
+    *,
+    board_name: str = "",
+    paste_plots: dict[str, Path] | None = None,
+    component_materials: dict[str, tuple[SourceMaterial, ...]] | None = None,
+) -> PcbGeometry | None:
     updated = model.with_suffix(".tmp")
     with model.open("rb") as source:
         magic, version, length = struct.unpack("<4sII", source.read(12))
@@ -35,8 +41,12 @@ def prepare_preview_materials(
         ):
             raise ValueError("Expected a GLB 2.0 scene.")
         scene = json.loads(source.read(chunk_length))
+        geometry = pcb_geometry(scene, board_name)
         tagged = tag_board_materials(scene, board_name)
-        changed = adjust_materials(scene.get("materials", []))
+        # Match the original colors and leave the restored glass out of board finish tuning.
+        materials = list(scene.get("materials", []))
+        restored = restore_component_opacity(scene, component_materials or {})
+        changed = adjust_materials(materials)
         binary_start = source.tell()
         extra = b""
         if paste_plots:
@@ -49,8 +59,8 @@ def prepare_preview_materials(
                 scene["buffers"][0]["byteLength"] = binary_size + len(extra)
             else:
                 source.seek(binary_start)
-        if not tagged and not changed and not extra:
-            return
+        if not tagged and not restored and not changed and not extra:
+            return geometry
 
         data = json.dumps(scene, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         data += b" " * (-len(data) % 4)
@@ -63,6 +73,26 @@ def prepare_preview_materials(
             shutil.copyfileobj(source, target)
             target.write(extra)
     updated.replace(model)
+    return geometry
+
+
+def pcb_geometry(scene: dict, board_name: str) -> PcbGeometry | None:
+    """Read the KiCad PCB body bounds, excluding overhanging footprint models."""
+    accessors = scene.get("accessors", [])
+    positions = [
+        accessors[primitive["attributes"]["POSITION"]]
+        for mesh in scene.get("meshes", [])
+        if board_name and mesh.get("name") == f"{board_name}_PCB"
+        for primitive in mesh["primitives"]
+        if "POSITION" in primitive.get("attributes", {})
+    ]
+    if not positions:
+        return None
+
+    x0, y0, z0 = (min(item["min"][axis] for item in positions) for axis in range(3))
+    x1, y1, z1 = (max(item["max"][axis] for item in positions) for axis in range(3))
+    center = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
+    return PcbGeometry(center, max(x1 - x0, z1 - z0))
 
 
 def tag_board_materials(scene: dict, board_name: str) -> bool:

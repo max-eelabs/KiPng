@@ -17,7 +17,9 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 
 3. Enable **Enable KiCad API** in **Preferences → Plugins**, restart KiCad, and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
 
-The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project. VRML-only footprint models require a matching STEP or IGES file to appear in the GLB.
+The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
+
+When the GLB includes a VRML footprint model, KiPng can recover source transparency for the live preview and Viewport PNGs. This works when the footprint has one readable VRML model and each affected GLB material color identifies a single opacity in that model.
 
 In **Render**, choose **Ray Tracing** for KiCad's raytraced lighting or **Viewport** for the Qt 3D preview's appearance. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Ray Tracing at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
 
@@ -36,6 +38,21 @@ python plugin/render.py board.kicad_pcb --output-dir renders
 ```
 
 Choose **File > Copy CLI** in the preview to reproduce its current framing and render settings. See the [CLI reference](doc/CLI.MD) for installation paths, options, defaults, and examples.
+
+## Logging
+
+Choose **File > Open Log** to open KiPng's current log in your default text editor. The preview and CLI share `%LOCALAPPDATA%\KiPng\logs\kipng.txt` on Windows. KiPng rotates the log at about 10 MiB and keeps nine backups, deleting the oldest on each rollover.
+
+If your text editor holds the file open with a lock that prevents renaming on Windows, KiPng keeps appending and retries rotation on the next write. Close the log tab to release the lock.
+
+The default level is `INFO`. To enable `DEBUG` for the preview, close KiCad and launch it from PowerShell with the environment variable set. The CLI also reads `KIPNG_LOG_LEVEL` and accepts a per-run `--log-level` override.
+
+```powershell
+$env:KIPNG_LOG_LEVEL = 'DEBUG'
+& "$env:ProgramFiles\KiCad\10.0\bin\kicad.exe"
+```
+
+If an existing plugin environment is missing the logging dependency after an upgrade, right-click the **3D Preview** action in the PCB Editor's plugin preferences and select **Recreate Plugin Environment**. [KiCad IPC plugin debugging](https://dev-docs.kicad.org/en/apis-and-binding/ipc-api/for-addon-developers/#debugging)
 
 ## Project structure
 

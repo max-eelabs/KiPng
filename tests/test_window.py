@@ -145,7 +145,7 @@ def test_render_captures_camera_palette_format_and_snapshot(app, monkeypatch, tm
     output = tmp_path / "project-render-2880x2160.png"
     renderer = Mock(return_value=output)
     monkeypatch.setattr(window, "BoardViewport", FakeViewport)
-    monkeypatch.setattr(FakeViewport, "capture_camera", lambda self: camera, raising=False)
+    monkeypatch.setattr(FakeViewport, "capture_camera", lambda *_: camera, raising=False)
     monkeypatch.setattr(
         "kipng.ui.controls.render.QFileDialog.getExistingDirectory",
         lambda *args: str(tmp_path),

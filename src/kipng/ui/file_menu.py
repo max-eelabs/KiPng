@@ -4,8 +4,11 @@
 """File menu actions and always-visible keyboard mnemonics."""
 
 from collections.abc import Callable
+from pathlib import Path
 
-from PySide6.QtWidgets import QMenuBar, QProxyStyle, QStyle, QWidget
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import QMenuBar, QMessageBox, QProxyStyle, QStyle, QWidget
 
 
 class MnemonicStyle(QProxyStyle):
@@ -24,6 +27,7 @@ class FileMenuBar(QMenuBar):
         reload_board: Callable[[], None],
         reset: Callable[[], None],
         close: Callable[[], bool],
+        log: Path | None,
     ) -> None:
         super().__init__(parent)
         self.setNativeMenuBar(False)
@@ -38,7 +42,15 @@ class FileMenuBar(QMenuBar):
         self.reload_action = self.file_menu.addAction("Re&load Board", reload_board)
         self.reset_action = self.file_menu.addAction("Reset to &Default", reset)
         self.file_menu.addSeparator()
+        self.open_log_action = self.file_menu.addAction("&Open Log")
+        self.open_log_action.setEnabled(log is not None)
+        if log is not None:
+            self.open_log_action.triggered.connect(lambda: self.open_log(log))
         self.file_menu.addAction("E&xit", close)
+
+    def open_log(self, path: Path) -> None:
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+            QMessageBox.warning(self, "Could not open log", f"Open this file manually:\n{path}")
 
     def set_availability(self, ready: bool, has_snapshot: bool, has_renderer: bool) -> None:
         self.render_action.setEnabled(ready and has_snapshot and has_renderer)

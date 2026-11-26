@@ -3,7 +3,7 @@
 
 """Preview window and the transition from export to an interactive viewport."""
 
-import traceback
+import logging
 from contextlib import suppress
 from pathlib import Path
 from queue import Empty, Queue
@@ -13,20 +13,27 @@ from PySide6.QtCore import QByteArray, QSize, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QMessageBox, QStackedLayout, QWidget
 
-from ..contracts import BoardSnapshot, ImageRenderer, ModelExporter, PreviewCancelled, PreviewError
+from ..contracts import BoardSnapshot, ImageRenderer, ModelExporter
 from .controls.panel import ControlsPanel
 from .copy_cli import copy_cli
 from .file_menu import FileMenuBar
 from .loading import LOADER_SIZE, LoadingScreen, resize_centered, show_compact
+from .preview_export import prepare_preview_model
 from .viewport.pane import BoardViewport
 
 VIEWPORT_TIMEOUT_MS = 30_000
 PREVIEW_MINIMUM_SIZE = QSize(560, 300)
+LOGGER = logging.getLogger(__name__)
 
 
 class PreviewWindow(QWidget):
     def __init__(
-        self, model: Path, exporter: ModelExporter, renderer: ImageRenderer | None = None
+        self,
+        model: Path,
+        exporter: ModelExporter,
+        renderer: ImageRenderer | None = None,
+        *,
+        log: Path | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("KiPng - 3D Preview")
@@ -57,6 +64,7 @@ class PreviewWindow(QWidget):
             self.reload_board,
             self.reset_settings,
             self.close,
+            log,
         )
         self.stack.setMenuBar(self.menu_bar)
         self.menu_bar.hide()
@@ -104,7 +112,11 @@ class PreviewWindow(QWidget):
         self.loading.show_progress()
         self.stack.setCurrentWidget(self.loading)
         self.loading.show()
-        self.worker = Thread(target=self.prepare_model, args=(model,), name="board-preview")
+        self.worker = Thread(
+            target=prepare_preview_model,
+            args=(self.exporter, model, self.cancelled, self.results, self.reload_count > 0),
+            name="board-preview",
+        )
         self.poll.start()
         self.update_menu()
         self.worker.start()
@@ -130,20 +142,6 @@ class PreviewWindow(QWidget):
         previous.hide()
         previous.deleteLater()
         self.controls.set_ready(self.snapshot)
-
-    def prepare_model(self, model: Path) -> None:
-        # The worker only deals with files and IPC. Widgets are updated on the Qt thread.
-        try:
-            snapshot = self.exporter(model, self.cancelled)
-            if not self.cancelled.is_set():
-                self.results.put(snapshot)
-        except PreviewCancelled:
-            pass
-        except PreviewError as error:
-            self.results.put(str(error))
-        except Exception:
-            traceback.print_exc()
-            self.results.put("An unexpected preview error occurred. Check the KiCad plugin output.")
 
     def show_result(self) -> None:
         try:
@@ -226,10 +224,11 @@ class PreviewWindow(QWidget):
         self.loading.show()
         self.stack.setCurrentWidget(self.loading)
         self.board_ready = False
-        self.menu_bar.hide()
+        self.menu_bar.setVisible(self.menu_bar.open_log_action.isEnabled())
         self.update_menu()
 
     def show_viewport_timeout(self) -> None:
+        LOGGER.error("The 3D view timed out while opening the board.")
         self.show_error(
             "The 3D view did not become ready. Close this window and reopen 3D Preview."
         )

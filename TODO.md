@@ -4,7 +4,7 @@
 - [x] Fix long dashes - people will notice it is vibecoded
 - [x] Add top menu with file (render, reload board, reset to default and exit)
 - [x] Add configuration export (Copy CLI command) and command line support to execute command
-- [ ] Prepare for official repo listing 
+- [ ] Prepare for official repo listing, update plugin/plugin.json, make sure plugin versioning is well supported and logged
 - [ ] Automate release builds, so we can produce standard 
 
 - [ ] Add palette rendering option which will disable unrelated controls

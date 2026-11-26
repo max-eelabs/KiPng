@@ -3,7 +3,7 @@
 
 """Save an image from the current viewport camera without blocking the GUI."""
 
-import traceback
+import logging
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
@@ -19,6 +19,8 @@ from ...contracts.background import BackgroundSettings
 from ...contracts.render import RenderEngine
 from ..viewport.pane import BoardViewport
 from ..viewport.render import ViewportCapture, save_viewport_render
+
+LOGGER = logging.getLogger(__name__)
 
 
 class RenderControls(QWidget):
@@ -51,7 +53,7 @@ class RenderControls(QWidget):
         if self.busy or self.cancelled.is_set():
             return
 
-        camera = view.capture_camera()
+        camera = view.capture_camera(snapshot.pcb_geometry)
         color_scheme = view.color_scheme
         background = view.background
         shadow = view.shadow
@@ -62,6 +64,7 @@ class RenderControls(QWidget):
         if not destination or self.cancelled.is_set():
             return
         if engine is RenderEngine.VIEWPORT and min(camera.distance, camera.frame_half_width) <= 0:
+            LOGGER.warning("Viewport rendering failed because the board is behind the camera.")
             QMessageBox.warning(
                 self,
                 "Render failed",
@@ -69,6 +72,7 @@ class RenderControls(QWidget):
             )
             return
 
+        LOGGER.info("Starting %s render.", engine.value)
         self.status.hide()
         self.button.setEnabled(False)
         self.button.setText("Rendering…")
@@ -130,6 +134,7 @@ class RenderControls(QWidget):
 
     def capture_failed(self, message: str) -> None:
         if self.capture is not None and not self.cancelled.is_set():
+            LOGGER.error("Viewport capture failed: %s", message)
             self.results.put(message)
             self.show_result()
 
@@ -137,14 +142,13 @@ class RenderControls(QWidget):
         try:
             self.results.put(render())
         except PreviewCancelled:
-            pass
+            LOGGER.info("Render cancelled.")
         except PreviewError as error:
+            LOGGER.error("Render failed: %s", error)
             self.results.put(str(error))
         except Exception:
-            traceback.print_exc()
-            self.results.put(
-                "An unexpected rendering error occurred. Check the KiCad plugin output."
-            )
+            LOGGER.exception("Render failed unexpectedly.")
+            self.results.put("An unexpected rendering error occurred.")
 
     def show_result(self) -> None:
         try:
@@ -159,6 +163,7 @@ class RenderControls(QWidget):
             QMessageBox.warning(self, "Render failed", result)
             return
 
+        LOGGER.info("Saved PNG to %s.", result)
         self.status.setText("Saved PNG.")
         self.status.setToolTip(str(result))
         self.status.show()
