@@ -39,6 +39,21 @@ python plugin/render.py board.kicad_pcb --output-dir renders
 
 Choose **File > Copy CLI** in the preview to reproduce its current framing and render settings. See the [CLI reference](doc/CLI.MD) for installation paths, options, defaults, and examples.
 
+## Logging
+
+Choose **File > Open Log** to open KiPng's current log in your default text editor. The preview and CLI share `%LOCALAPPDATA%\KiPng\logs\kipng.txt` on Windows. KiPng rotates the log at about 10 MiB and keeps nine backups, deleting the oldest on each rollover.
+
+If your text editor holds the file open with a lock that prevents renaming on Windows, KiPng keeps appending and retries rotation on the next write. Close the log tab to release the lock.
+
+The default level is `INFO`. To enable `DEBUG` for the preview, close KiCad and launch it from PowerShell with the environment variable set. The CLI also reads `KIPNG_LOG_LEVEL` and accepts a per-run `--log-level` override.
+
+```powershell
+$env:KIPNG_LOG_LEVEL = 'DEBUG'
+& "$env:ProgramFiles\KiCad\10.0\bin\kicad.exe"
+```
+
+If an existing plugin environment is missing the logging dependency after an upgrade, right-click the **3D Preview** action in the PCB Editor's plugin preferences and select **Recreate Plugin Environment**. [KiCad IPC plugin debugging](https://dev-docs.kicad.org/en/apis-and-binding/ipc-api/for-addon-developers/#debugging)
+
 ## Project structure
 
 | Path | Purpose |

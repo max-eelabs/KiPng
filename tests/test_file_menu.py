@@ -36,7 +36,7 @@ def test_file_menu_reload_preserves_settings_and_refreshes_snapshot(app, monkeyp
     warning = Mock()
     monkeypatch.setattr(window, "BoardViewport", FakeViewport)
     monkeypatch.setattr(window.QMessageBox, "warning", warning)
-    preview = window.PreviewWindow(model, export, Mock())
+    preview = window.PreviewWindow(model, export, Mock(), log=tmp_path / "kipng.txt")
     preview.show()
     preview.start()
     try:
@@ -50,6 +50,7 @@ def test_file_menu_reload_preserves_settings_and_refreshes_snapshot(app, monkeyp
             "&Copy CLI",
             "Re&load Board",
             "Reset to &Default",
+            "&Open Log",
             "E&xit",
         ]
 
@@ -62,6 +63,7 @@ def test_file_menu_reload_preserves_settings_and_refreshes_snapshot(app, monkeyp
                 "Alt+C",
                 "Alt+L",
                 "Alt+D",
+                "Alt+O",
                 "Alt+X",
             ]
 

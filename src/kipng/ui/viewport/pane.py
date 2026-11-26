@@ -3,6 +3,7 @@
 
 """Qt widget that translates QML readiness and failures into Python signals."""
 
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl, Signal
@@ -26,6 +27,7 @@ from .colors import layer_colors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
 FEATURES_DIR = VIEWPORT_QML.with_name("features")
+LOGGER = logging.getLogger(__name__)
 
 
 class BoardViewport(QQuickWidget):
@@ -57,7 +59,11 @@ class BoardViewport(QQuickWidget):
         self.set_camera_view(FRONT_PITCH, FRONT_YAW, True)
 
     def show_graphics_error(self, _error, message: str) -> None:
-        self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
+        self.report_failure(f"Could not start the 3D viewport.\n\n{message}")
+
+    def report_failure(self, message: str) -> None:
+        LOGGER.error("%s", message)
+        self.failed.emit(message)
 
     def load_model(self, model: Path, *, capture: bool = False) -> None:
         self.board_materials.clear()
@@ -65,12 +71,12 @@ class BoardViewport(QQuickWidget):
         scene = self.rootObject()
         if scene is None:
             errors = "\n".join(error.description() for error in self.errors())
-            self.failed.emit(f"Could not load the 3D viewport.\n\n{errors}")
+            self.report_failure(f"Could not load the 3D viewport.\n\n{errors}")
             return
 
         # Defer switching pages while Qt handles the camera and bounds update.
         scene.framedChanged.connect(lambda: QTimer.singleShot(0, self.ready.emit))
-        scene.loadFailed.connect(self.failed)
+        scene.loadFailed.connect(self.report_failure)
         scene.setProperty("defaultAngles", QVector2D(FRONT_PITCH, FRONT_YAW))
         self.set_output_size(self.output_size)
         self.show_render_frame(self.render_frame_visible)

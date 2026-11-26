@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from kipng import cli
+from kipng import cli, diagnostics
 from kipng.cli import create_parser, render
 from kipng.contracts import BoardSnapshot, ViewportCamera
 from kipng.contracts.background import BackgroundSettings, BackgroundTexture
@@ -29,11 +29,14 @@ def test_cli_flushes_the_saved_png_path_to_stdout(tmp_path, monkeypatch):
     monkeypatch.setattr(stdout, "flush", flush)
     monkeypatch.setattr(sys, "stdout", stdout)
     monkeypatch.setattr(cli, "render", Mock(return_value=png))
+    monkeypatch.setattr(diagnostics, "log_path", lambda: tmp_path / "kipng.txt")
+    monkeypatch.delenv("KIPNG_LOG_LEVEL", raising=False)
 
     # The CLI reports the path before process shutdown.
     assert cli.main(["board.kicad_pcb"]) == 0
     assert stdout.getvalue() == f"{png}\n"
     flush.assert_called_once_with()
+    assert "Saved PNG" in (tmp_path / "kipng.txt").read_text(encoding="utf-8")
 
 
 def test_cli_passes_render_settings_and_saved_board_to_ray_tracer(tmp_path, monkeypatch):
@@ -85,6 +88,7 @@ def test_cli_passes_render_settings_and_saved_board_to_ray_tracer(tmp_path, monk
         ["--camera=-90,0,1,0,0,1,0"],
         ["--light-x=-101"],
         ["--background=not-a-color"],
+        ["--log-level=verbose"],
     ],
 )
 def test_cli_rejects_invalid_control_values(options):

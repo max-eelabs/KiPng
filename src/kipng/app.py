@@ -3,6 +3,7 @@
 
 """Assemble the preview and own its temporary model directory."""
 
+import logging
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,10 +11,13 @@ from tempfile import TemporaryDirectory
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
+from .diagnostics import configure_logging
 from .export.exporter import export_board_model
 from .export.render import render_board_image
 from .ui.taskbar import APP_ID, TaskbarIcon
 from .ui.window import PreviewWindow
+
+LOGGER = logging.getLogger(__name__)
 
 
 def plugin_asset(name: str) -> Path:
@@ -39,16 +43,30 @@ def create_application() -> QApplication:
 
 
 def main() -> int:
+    with configure_logging() as log:
+        LOGGER.info("Starting 3D Preview.")
+        try:
+            result = run_preview(log)
+        except Exception:
+            LOGGER.exception("3D Preview stopped unexpectedly.")
+            message = f" See {log}." if log is not None else ""
+            print(f"KiPng: 3D Preview stopped unexpectedly.{message}", file=sys.stderr)
+            return 1
+        LOGGER.info("3D Preview closed with exit code %d.", result)
+        return result
+
+
+def run_preview(log: Path | None) -> int:
     app = create_application()
     with TemporaryDirectory(prefix="kipng-") as directory:
         window = PreviewWindow(
-            Path(directory) / "board.glb", export_board_model, render_board_image
+            Path(directory) / "board.glb", export_board_model, render_board_image, log=log
         )
         if sys.platform == "win32" and app.platformName() == "windows":
             window.taskbar_icon = TaskbarIcon(window, plugin_asset("kipng-logo.ico"))
-        window.show()
-        window.start()
         try:
+            window.show()
+            window.start()
             return app.exec()
         finally:
             # Release the QML scene before the temporary GLB is removed on Windows.
