@@ -14,15 +14,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...viewport.pane import FRONT_PITCH, FRONT_YAW, BoardViewport
-
-# Turning both angles by 180 flips to the underside and mirrors the view.
-CAMERA_PRESETS = (
-    ("Default Front", FRONT_PITCH, FRONT_YAW, True),
-    ("Default Back", FRONT_PITCH + 180, FRONT_YAW + 180, True),
-    ("Straight Top", -90, 0, False),
-    ("Straight Bottom", 90, 180, False),
-)
+from ....contracts.render import CAMERA_PRESETS
+from ...viewport.pane import BoardViewport
 
 
 def create_section(get_viewport: Callable[[], BoardViewport | None]) -> QWidget:

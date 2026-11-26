@@ -17,7 +17,7 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 
 3. Enable **Enable KiCad API** in **Preferences → Plugins**, restart KiCad, and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
 
-The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. The project directory must be writable so the plugin can briefly save a snapshot beside the original board and retain relative model paths. VRML-only footprint models require a matching STEP or IGES file to appear in the GLB.
+The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project. VRML-only footprint models require a matching STEP or IGES file to appear in the GLB.
 
 In **Render**, choose **Ray Tracing** for KiCad's raytraced lighting or **Viewport** for the Qt 3D preview's appearance. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Ray Tracing at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
 
@@ -27,19 +27,30 @@ Drag **Light X** and **Light Y** to move the shadow. All three sliders start cen
 
 In the **Viewport** section, turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Frame the part of the board you want to show, then click **Render** and choose a folder. Both engines crop the PNG to the frame, so the board can extend past the edges. The PNG uses the current camera angle, zoom, pan, and background with a soft shadow.
 
+## Render from the command line
+
+Use the CLI to export a PNG from a saved PCB without opening the editor. With KiCad 10.0 and the Python dependencies installed, run this from the source checkout.
+
+```text
+python plugin/render.py board.kicad_pcb --output-dir renders
+```
+
+Choose **File > Copy CLI** in the preview to reproduce its current framing and render settings. See the [CLI reference](doc/CLI.MD) for installation paths, options, defaults, and examples.
+
 ## Project structure
 
 | Path | Purpose |
 | --- | --- |
 | `plugin/` | KiCad manifest, toolbar entrypoint, icons, and runtime dependencies. |
 | `src/kipng/app.py` | Application entrypoint that assembles and launches the preview. |
+| `src/kipng/cli.py` | Command-line rendering of saved PCBs. |
 | `src/kipng/contracts/` | Shared data, interfaces, and preview errors. |
 | `src/kipng/export/` | Board capture, CLI export, and GLB preview materials. |
 | `src/kipng/ui/window.py` | Window layout and loading state. |
 | `src/kipng/ui/viewport/` | Left pane, QML scene, camera interaction, and overlays. |
 | `src/kipng/ui/controls/` | Right pane, control sections, and the Render footer. |
 | `tests/` | Export, material, UI, installation, and source-length checks. |
-| `.github/workflows/ci.yml` | Windows CI for the supported Python range. |
+| `.github/workflows/ci.yml` | Python 3.10 CI on Windows, Linux, and macOS. |
 
 The exporter accepts a `BoardSource` for supplying board snapshots. The window accepts a `ModelExporter` and receives model readiness and errors from the viewport through Qt signals.
 
@@ -49,6 +60,7 @@ The installer places the contents of `plugin/` and the `kipng` package together 
 
 - Add a QML component to [`src/kipng/ui/viewport/qml/features/`](src/kipng/ui/viewport/qml/features/README.md) to overlay controls or information on the 3D viewport.
 - Add a Python module to `src/kipng/ui/controls/sections/` that defines `create_section(get_viewport)` and returns a `QWidget`. The panel loads sections in filename order above Render. `get_viewport()` returns the current `BoardViewport` once it has been created, so call it when handling input. Filenames starting with `_` are reserved for helpers.
+- Define image-affecting settings in `src/kipng/contracts/options.py` so the controls, CLI, and copied command use the same option definitions.
 
 ## Development and testing
 
@@ -61,7 +73,7 @@ python -m ruff format --check .
 python -m pytest
 ```
 
-The suite uses temporary files, substitutes the KiCad editor and model exporter where needed, and checks the Qt window offscreen. The Windows installer test uses a temporary KiCad documents directory. GitHub Actions runs these checks on pushes and pull requests. Source files are limited to 250 lines.
+The suite uses temporary files, substitutes the KiCad editor and model exporter where needed, and checks the Qt window offscreen. GitHub Actions checks the CLI entrypoint and runs the suite on Windows, Linux, and macOS with Python 3.10 on pushes and pull requests. The installer test runs on Windows with a temporary KiCad documents directory. Source files are limited to 250 lines.
 
 For a desktop smoke check, install the plugin into KiCad 10.0 and open **3D Preview** on an edited board. Check the loading transition, the board finish, orbit, pan, and zoom. Click **Render** and check the camera angle and framing in the PNG.
 

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QMessageBox, QStackedLayout, 
 
 from ..contracts import BoardSnapshot, ImageRenderer, ModelExporter, PreviewCancelled, PreviewError
 from .controls.panel import ControlsPanel
+from .copy_cli import copy_cli
 from .file_menu import FileMenuBar
 from .loading import LOADER_SIZE, LoadingScreen, resize_centered, show_compact
 from .viewport.pane import BoardViewport
@@ -52,6 +53,7 @@ class PreviewWindow(QWidget):
         self.menu_bar = FileMenuBar(
             self,
             lambda: self.controls.start_render(),
+            lambda: copy_cli(self.viewer, self.snapshot),
             self.reload_board,
             self.reset_settings,
             self.close,
@@ -89,7 +91,7 @@ class PreviewWindow(QWidget):
         rendering = render is not None and render.busy
         loading = self.poll.isActive() or self.viewport_timeout.isActive()
         ready = self.board_ready and not loading and not rendering and not self.cancelled.is_set()
-        self.menu_bar.set_availability(ready, render is not None and self.snapshot is not None)
+        self.menu_bar.set_availability(ready, self.snapshot is not None, render is not None)
 
     def start(self) -> None:
         self.start_export(self.model)

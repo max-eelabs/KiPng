@@ -129,3 +129,15 @@ for widget in (window, dialog):
         timeout=15,
     )
     assert result.returncode == 0, result.stderr
+
+    # Invoke the installed CLI by its absolute path from another directory.
+    cli_help = subprocess.run(
+        [sys.executable, "-B", str(target / "render.py"), "--help"],
+        cwd=tmp_path,
+        env=launch_env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert cli_help.returncode == 0, cli_help.stderr
+    assert "BOARD.kicad_pcb" in cli_help.stdout and "--camera" in cli_help.stdout

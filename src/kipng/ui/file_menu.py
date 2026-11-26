@@ -20,6 +20,7 @@ class FileMenuBar(QMenuBar):
         self,
         parent: QWidget,
         render: Callable[[], None],
+        copy_cli: Callable[[], None],
         reload_board: Callable[[], None],
         reset: Callable[[], None],
         close: Callable[[], bool],
@@ -33,12 +34,14 @@ class FileMenuBar(QMenuBar):
         self.file_menu = self.addMenu("&File")
         self.file_menu.setStyle(self.mnemonic_style)
         self.render_action = self.file_menu.addAction("&Render", render)
+        self.copy_cli_action = self.file_menu.addAction("&Copy CLI", copy_cli)
         self.reload_action = self.file_menu.addAction("Re&load Board", reload_board)
         self.reset_action = self.file_menu.addAction("Reset to &Default", reset)
         self.file_menu.addSeparator()
         self.file_menu.addAction("E&xit", close)
 
-    def set_availability(self, ready: bool, can_render: bool) -> None:
-        self.render_action.setEnabled(ready and can_render)
+    def set_availability(self, ready: bool, has_snapshot: bool, has_renderer: bool) -> None:
+        self.render_action.setEnabled(ready and has_snapshot and has_renderer)
+        self.copy_cli_action.setEnabled(ready and has_snapshot)
         self.reload_action.setEnabled(ready)
         self.reset_action.setEnabled(ready)
