@@ -1,12 +1,21 @@
 # Copyright (c) 2026 Maxim Pavlov
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Camera presets for the viewport."""
+"""Camera presets and board colors for the viewport."""
 
 from collections.abc import Callable
 
-from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFormLayout,
+    QGridLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
+from ...viewport.colors import COLOR_SCHEMES
 from ...viewport.pane import FRONT_PITCH, FRONT_YAW, BoardViewport
 
 # Turning both angles by 180 flips to the underside and mirrors the view.
@@ -39,4 +48,16 @@ def create_section(get_viewport: Callable[[], BoardViewport | None]) -> QWidget:
         button.clicked.connect(lambda _checked=False, view=view: apply_view(*view))
         presets.addWidget(button, index // 2, index % 2)
     layout.addLayout(presets)
+
+    def apply_color_scheme(name: str) -> None:
+        viewport = get_viewport()
+        if viewport is not None:
+            viewport.set_color_scheme(COLOR_SCHEMES[name])
+
+    color_scheme = QComboBox()
+    color_scheme.addItems(list(COLOR_SCHEMES))
+    color_scheme.currentTextChanged.connect(apply_color_scheme)
+    colors = QFormLayout()
+    colors.addRow("Color Scheme", color_scheme)
+    layout.addLayout(colors)
     return section

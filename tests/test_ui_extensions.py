@@ -27,6 +27,7 @@ def test_controls_panel_discovers_new_section(app, monkeypatch, tmp_path):
     assert [label.text() for label in panel.findChildren(QLabel)] == [
         "Discovered section",
         "Viewport",
+        "Color Scheme",
     ]
 
 

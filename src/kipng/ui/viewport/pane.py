@@ -7,9 +7,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QVector2D
+from PySide6.QtQuick3D import QQuick3DObject
 from PySide6.QtQuickWidgets import QQuickWidget
 
-from ...contracts import ViewportCamera
+from ...contracts import BOARD_MATERIAL_TAGS, ViewportCamera
+from .colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
 
 VIEWPORT_QML = Path(__file__).parent / "qml" / "Viewport.qml"
 FEATURES_DIR = VIEWPORT_QML.with_name("features")
@@ -27,11 +29,13 @@ class BoardViewport(QQuickWidget):
         self.setClearColor(QColor("white"))
         self.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         self.sceneGraphError.connect(self.show_graphics_error)
+        self.board_materials: list[tuple[QQuick3DObject, str]] = []
 
     def show_graphics_error(self, _error, message: str) -> None:
         self.failed.emit(f"Could not start the 3D viewport.\n\n{message}")
 
     def load_model(self, model: Path) -> None:
+        self.board_materials.clear()
         self.setSource(QUrl.fromLocalFile(str(VIEWPORT_QML)))
         scene = self.rootObject()
         if scene is None:
@@ -47,8 +51,22 @@ class BoardViewport(QQuickWidget):
         scene.setProperty("featureSources", sources)
         scene.setProperty("modelSource", QUrl.fromLocalFile(str(model)))
 
+        layers_by_tag = {tag: layer for layer, tag in BOARD_MATERIAL_TAGS.items()}
+        for material in scene.findChildren(QQuick3DObject):
+            layer = layers_by_tag.get(material.property("alphaCutoff"))
+            if layer is not None:
+                self.board_materials.append((material, layer))
+        self.set_color_scheme(COLOR_SCHEMES[DEFAULT_COLOR_SCHEME])
+
     def release_model(self) -> None:
+        self.board_materials.clear()
         self.setSource(QUrl())
+
+    def set_color_scheme(self, scheme: BoardColors) -> None:
+        """Apply a palette to the loaded board."""
+        colors = scheme.layer_colors()
+        for material, layer in self.board_materials:
+            material.setProperty("baseColor", colors[layer])
 
     def fit_board(self) -> None:
         """Center and fit the board using the viewport's current size."""
