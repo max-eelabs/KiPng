@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QComboBox, QFormLayout, QLabel, QVBoxLayout, QWidg
 from ....contracts.render import FHD_SIZES, RESOLUTION_SCALES, RenderEngine
 from ...viewport.colors import COLOR_SCHEMES
 from ...viewport.pane import BoardViewport
+from ._background import add_background_controls
 
 
 def create_section(get_viewport: Callable[[], BoardViewport | None]) -> QWidget:
@@ -57,6 +58,7 @@ def create_section(get_viewport: Callable[[], BoardViewport | None]) -> QWidget:
     options = QFormLayout()
     options.addRow("Engine", engine)
     options.addRow("Color Scheme", color_scheme)
+    add_background_controls(options, get_viewport)
     options.addRow("Resolution", resolution)
     options.addRow("Aspect Ratio", aspect_ratio)
     layout.addLayout(options)

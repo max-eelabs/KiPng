@@ -12,6 +12,8 @@ from threading import Event
 from PIL import Image, ImageChops, ImageFilter
 
 from ..contracts import PreviewCancelled, PreviewError
+from ..contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
+from .background import apply_background
 
 # Composite at twice FHD to keep the shadow consistent across resolutions.
 SCALE = 2
@@ -56,9 +58,7 @@ def composite(board: Image.Image, frame_size: tuple[int, int]) -> Image.Image:
     red, green, blue, alpha = board.crop(crop).split()
     lift = [round(255 * (value / 255) ** 0.90) for value in range(256)]
     lit_board = Image.merge("RGBA", (red.point(lift), green.point(lift), blue.point(lift), alpha))
-    scene = Image.alpha_composite(shadow, lit_board)
-    white = Image.new("RGBA", scene.size, "white")
-    return Image.alpha_composite(white, scene).convert("RGB")
+    return Image.alpha_composite(shadow, lit_board)
 
 
 def save_image(
@@ -67,6 +67,8 @@ def save_image(
     board_name: str,
     cancelled: Event,
     output_size: tuple[int, int],
+    *,
+    background: BackgroundSettings = DEFAULT_BACKGROUND,
 ) -> Path:
     if cancelled.is_set():
         raise PreviewCancelled
@@ -75,6 +77,7 @@ def save_image(
     width, height = output_size
     with TemporaryDirectory(prefix=".render-", dir=output_dir) as directory:
         staged = Path(directory) / "render.png"
+        master = apply_background(master, background, output_size)
         if master.size != output_size:
             master = master.resize(output_size, Image.Resampling.LANCZOS)
         master.save(staged, optimize=True)

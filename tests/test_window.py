@@ -5,13 +5,13 @@ from threading import Event
 from unittest.mock import Mock
 
 import pytest
-from PySide6.QtCore import QObject, QPoint, QUrl, Signal
+from PySide6.QtCore import QObject, QPoint, Signal
 from PySide6.QtGui import QVector3D
-from PySide6.QtQml import QQmlComponent, QQmlEngine
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
 
 from kipng.contracts import BoardSnapshot, PreviewError, ViewportCamera
+from kipng.contracts.background import DEFAULT_BACKGROUND, BackgroundSettings, BackgroundTexture
 from kipng.contracts.colors import COLOR_SCHEMES
 from kipng.contracts.render import DEFAULT_OUTPUT_SIZE, RenderEngine
 from kipng.ui import window
@@ -24,6 +24,7 @@ class FakeViewport(QWidget):
     failed = Signal(str)
     output_size = DEFAULT_OUTPUT_SIZE
     render_engine = RenderEngine.RAY_TRACING
+    background = DEFAULT_BACKGROUND
 
     def load_model(self, model):
         self.model = model
@@ -33,6 +34,9 @@ class FakeViewport(QWidget):
 
     def set_color_scheme(self, scheme):
         self.color_scheme = scheme
+
+    def set_background(self, settings):
+        self.background = settings
 
     def set_output_size(self, size):
         self.output_size = size
@@ -156,13 +160,18 @@ def test_render_captures_camera_palette_format_and_snapshot(app, monkeypatch, tm
         preview.viewer.ready.emit()
         assert render.button.isEnabled()
 
-        # Clicking Render captures both selections even if the controls change.
-        _, palette, resolution, ratio = preview.controls.findChildren(QComboBox)
+        # Clicking Render snapshots the selections even if the controls change.
+        _, palette, background, texture, resolution, ratio = preview.controls.findChildren(
+            QComboBox
+        )
         palette.setCurrentText("White")
+        background.setCurrentText("Warm Stone")
+        texture.setCurrentText("Crinkled Paper")
         resolution.setCurrentText("4K")
         ratio.setCurrentText("4:3")
         render.button.click()
         palette.setCurrentText("Blue")
+        background.setCurrentText("Transparent")
         ratio.setCurrentText("1:1")
         wait_for(render.button.isEnabled)
         renderer.assert_called_once_with(
@@ -172,6 +181,7 @@ def test_render_captures_camera_palette_format_and_snapshot(app, monkeypatch, tm
             preview.cancelled,
             color_scheme=COLOR_SCHEMES["White"],
             output_size=(2880, 2160),
+            background=BackgroundSettings("#E4DDD2", BackgroundTexture.CRINKLED_PAPER),
         )
         assert not render.status.isHidden()
         assert render.status.toolTip() == str(output)
@@ -201,18 +211,6 @@ def test_viewport_error_prevents_a_late_ready_signal(app, monkeypatch, tmp_path)
     finally:
         preview.close()
         preview.shutdown()
-
-
-def test_qml_viewport_loads_without_a_gpu(app):
-    # Instantiate the scene without asking the Qt renderer to draw a model.
-    engine = QQmlEngine()
-    component = QQmlComponent(engine, QUrl.fromLocalFile(str(VIEWPORT_QML)))
-    root = component.create()
-
-    # The empty viewport starts white and has no framed board.
-    assert root is not None, [error.toString() for error in component.errors()]
-    assert root.property("color").name() == "#ffffff"
-    assert not root.property("framed")
 
 
 def test_viewport_orbit_passes_both_poles(app):

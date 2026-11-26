@@ -16,6 +16,9 @@ Rectangle {
     property real renderAspectRatio: 9 / 16
     property bool renderFrameVisible: false
     property bool captureMode: false
+    property color backgroundColor: "white"
+    property url backgroundPattern
+    property bool backgroundTextured: false
     readonly property real renderFrameInset: captureMode ? 0 : 16
     readonly property real renderFrameWidth: Math.min(
         Math.max(0, width - 2 * renderFrameInset),
@@ -72,8 +75,23 @@ Rectangle {
         boardCamera.fieldOfView = 360 / Math.PI * Math.atan(halfWidth / distance / renderAspectRatio)
     }
 
-    color: "white"
+    color: captureMode ? "transparent" : backgroundColor
     clip: true
+
+    Image {
+        // Scale the FHD texture tile to the frame and leave the checkerboard at UI scale.
+        scale: viewport.backgroundTextured
+            ? Math.max(1, Math.min(viewport.renderFrameWidth, viewport.renderFrameHeight)) / 1080
+            : 1
+        width: parent.width / scale
+        height: parent.height / scale
+        transformOrigin: Item.TopLeft
+        horizontalAlignment: Image.AlignLeft
+        verticalAlignment: Image.AlignTop
+        fillMode: Image.Tile
+        source: viewport.captureMode ? "" : viewport.backgroundPattern
+        visible: status === Image.Ready
+    }
 
     View3D {
         anchors.fill: parent

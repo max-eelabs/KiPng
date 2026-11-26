@@ -13,6 +13,7 @@ from threading import Event
 from PIL import Image
 
 from ..contracts import BoardSnapshot, PreviewCancelled, PreviewError, ViewportCamera
+from ..contracts.background import DEFAULT_BACKGROUND, BackgroundSettings
 from ..contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, PREVIEW_COPPER_RGB, BoardColors
 from ..contracts.render import DEFAULT_OUTPUT_SIZE, FHD_SIZES
 from .board import stage_board
@@ -129,6 +130,7 @@ def render_board_image(
     *,
     color_scheme: BoardColors = COLOR_SCHEMES[DEFAULT_COLOR_SCHEME],
     output_size: tuple[int, int] = DEFAULT_OUTPUT_SIZE,
+    background: BackgroundSettings = DEFAULT_BACKGROUND,
 ) -> Path:
     # Supersample FHD. The same raytrace canvas provides native pixels for 4K.
     composite_size = (
@@ -176,6 +178,8 @@ def render_board_image(
             with Image.open(target) as raw:
                 master = composite(raw.convert("RGBA"), composite_size)
             name = Path(snapshot.project_name).name or "board"
-            return save_image(master, output_dir, name, cancelled, output_size)
+            return save_image(
+                master, output_dir, name, cancelled, output_size, background=background
+            )
     except (OSError, ValueError) as error:
         raise PreviewError(f"Could not render the board.\n\n{error}") from error

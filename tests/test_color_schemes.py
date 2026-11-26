@@ -72,7 +72,7 @@ def test_color_scheme_switches_live_board_materials_and_restores_green(app, tmp_
     prepare_preview_materials(model, board_name="board")
     view = BoardViewport()
     section = create_section(lambda: view)
-    _, selector, _, _ = section.findChildren(QComboBox)
+    _, selector, _, _, _, _ = section.findChildren(QComboBox)
     try:
         view.load_model(model)
         view.set_camera_view(-60, 30)
