@@ -142,7 +142,8 @@ def test_render_frame_follows_aspect_ratio_and_viewport_size(app, tmp_path):
             if child.objectName() == "renderFrame"
         ]
         assert not frame.property("visible")
-        assert engine.currentText() == "Ray Tracing"
+        assert engine.currentText() == "Viewport"
+        assert view.render_engine.value == engine.currentText()
         assert (resolution.currentText(), ratio.currentText()) == ("FHD", "9:16")
         assert ratio.itemText(1) == "3:4"
         assert root.property("renderFrameWidth") / root.property("renderFrameHeight") == 9 / 16

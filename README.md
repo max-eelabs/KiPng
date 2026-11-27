@@ -6,22 +6,32 @@ KiPng adds a **3D Preview** button to the KiCad PCB Editor toolbar. It opens an 
 
 In the **Render** section, use **Color Scheme** to preview green, red, white, black, blue, purple, or yellow solder mask. The palette updates both board faces while keeping the current camera. The exported PNG uses the selected palette.
 
-## Install locally on Windows
+## Install on Windows, Linux, or macOS
+
+> **KiCad API required.** In KiCad, open **Preferences → Plugins** and turn on
+> **Enable KiCad API**. KiPng uses the IPC API to read the open board, including
+> unsaved edits. The **3D Preview** action requires this setting to work.
+> [KiCad 10.0 plugin preferences](https://docs.kicad.org/10.0/en/kicad/kicad.html#plugins-preferences)
 
 1. Install KiCad 10.0 with its command-line tools and configure a 64-bit Python 3.10–3.13 interpreter in **Preferences → Plugins**. KiCad installs the dependencies listed in the plugin's `requirements.txt`.
-2. Run the install command from the workspace root. It installs or updates the plugin in your KiCad 10.0 user plugin directory and respects `KICAD_DOCUMENTS_HOME`.
+2. Get the versioned ZIP from [GitHub Releases](https://github.com/max-eelabs/KiPng/releases). To build it from a checkout on Windows, run the packaging command from the workspace root.
 
    ```powershell
    .\install.cmd
    ```
 
-3. Enable **Enable KiCad API** in **Preferences → Plugins**, restart KiCad, and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
+3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the ZIP. Local builds place it in `dist/`, for example `KiPng-0.1.0-SNAPSHOT.zip`. KiPng appears under **Installed**.
+4. Restart KiCad and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
 
-The plugin looks for the CLI in the running editor's installation, the default Windows installation, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
+If you previously installed a ZIP with the `org.kipng.preview` identifier, uninstall that entry in PCM before installing the current ZIP. If you previously installed with the copy-based script, close KiCad after installing the ZIP and move the old `kipng` folder out of the KiCad 10.0 user `plugins/` directory before restarting. This prevents both copies from registering the same action.
+
+For direct development installs on Windows, use `.\install.cmd -Local`. It copies or updates the files in the user plugin directory and respects `KICAD_DOCUMENTS_HOME`. Use one installation mode at a time.
+
+The plugin looks for the CLI in the running editor's installation, the standard Windows or macOS installation when applicable, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
 
 When the GLB includes a VRML footprint model, KiPng can recover source transparency for the live preview and Viewport PNGs. This works when the footprint has one readable VRML model and each affected GLB material color identifies a single opacity in that model.
 
-In **Render**, choose **Ray Tracing** for KiCad's raytraced lighting or **Viewport** for the Qt 3D preview's appearance. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Ray Tracing at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
+In **Render**, choose **Viewport** for the Qt 3D preview's appearance or **Ray Tracing** for KiCad's raytraced lighting. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Viewport at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
 
 Choose **Background** to change the backdrop in the preview and exported PNG. Use White, one of the muted presets, or **Custom** with a six-digit RGB hex color. On opaque colors other than pure white, set **Texture** to None, Fabric Grain, or Crinkled Paper. **Transparent** displays a checkerboard in the preview and saves a PNG with transparency and a soft shadow.
 
@@ -71,7 +81,7 @@ If an existing plugin environment is missing the logging dependency after an upg
 
 The exporter accepts a `BoardSource` for supplying board snapshots. The window accepts a `ModelExporter` and receives model readiness and errors from the viewport through Qt signals.
 
-The installer places the contents of `plugin/` and the `kipng` package together in KiCad's user plugin directory. This keeps KiCad's deployment layout out of the source tree.
+Both installation modes place the `kipng` runtime package beside `plugin.json`. This keeps KiCad's deployment layout out of the source tree.
 
 ### Extend the preview
 
@@ -80,6 +90,8 @@ The installer places the contents of `plugin/` and the `kipng` package together 
 - Define image-affecting settings in `src/kipng/contracts/options.py` so the controls, CLI, and copied command use the same option definitions.
 
 ## Development and testing
+
+See the [release guide](RELEASE.MD) for snapshot builds, tagged releases, and KiCad PCM submission.
 
 From the repository root, in an activated virtual environment, run:
 
@@ -90,7 +102,7 @@ python -m ruff format --check .
 python -m pytest
 ```
 
-The suite uses temporary files, substitutes the KiCad editor and model exporter where needed, and checks the Qt window offscreen. GitHub Actions checks the CLI entrypoint and runs the suite on Windows, Linux, and macOS with Python 3.10 on pushes and pull requests. The installer test runs on Windows with a temporary KiCad documents directory. Source files are limited to 250 lines.
+The suite uses temporary files, substitutes the KiCad editor and model exporter where needed, and checks the Qt window offscreen. GitHub Actions checks the CLI entrypoint and runs the suite on Windows, Linux, and macOS with Python 3.10 on pushes and pull requests. On Windows the installation tests build the PCM ZIP and verify a direct install in a temporary KiCad documents directory. Source files are limited to 250 lines.
 
 For a desktop smoke check, install the plugin into KiCad 10.0 and open **3D Preview** on an edited board. Check the loading transition, the board finish, orbit, pan, and zoom. Click **Render** and check the camera angle and framing in the PNG.
 

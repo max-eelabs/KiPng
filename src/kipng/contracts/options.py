@@ -86,7 +86,7 @@ class Control:
 ENGINE = Control(
     "engine",
     "Engine",
-    RenderEngine.RAY_TRACING.value,
+    RenderEngine.VIEWPORT.value,
     tuple(engine.value for engine in RenderEngine),
 )
 COLOR_SCHEME = Control("color_scheme", "Color Scheme", DEFAULT_COLOR_SCHEME, tuple(COLOR_SCHEMES))

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import qInstallMessageHandler, qWarning
 
-from kipng import cli, diagnostics
+from kipng import app, cli, diagnostics
 
 LOGGER = logging.getLogger("kipng.test")
 
@@ -150,3 +150,15 @@ def test_cli_help_does_not_create_a_log(log_path):
         cli.main(["--help"])
     assert result.value.code == 0
     assert not log_path.exists()
+
+
+def test_preview_logs_the_started_version_at_info(log_path, monkeypatch):
+    # Run the plugin entry point with a disposable log and no live PCB Editor.
+    version = (Path(__file__).resolve().parents[1] / "VERSION").read_text(encoding="ascii").strip()
+    monkeypatch.setattr(app, "run_preview", lambda _: 0)
+    assert app.main() == 0
+
+    # The startup record identifies both the version and its log level.
+    started = log_path.read_text(encoding="utf-8").splitlines()[0]
+    assert "INFO kipng.app" in started
+    assert started.endswith(f"Started KiPng {version}")

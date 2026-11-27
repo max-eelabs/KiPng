@@ -140,7 +140,7 @@ def test_reset_restores_startup_camera_and_render_controls(app, monkeypatch, tmp
         engine, palette, background, texture, resolution, ratio = preview.controls.findChildren(
             QComboBox
         )
-        engine.setCurrentText("Viewport")
+        engine.setCurrentText("Ray Tracing")
         palette.setCurrentText("Blue")
         background.setCurrentText("Custom")
         preview.controls.findChild(QLineEdit).setText("#123456")
@@ -155,13 +155,14 @@ def test_reset_restores_startup_camera_and_render_controls(app, monkeypatch, tmp
         # Reset keeps the current board while restoring the visible controls and state.
         preview.menu_bar.reset_action.trigger()
         combos = preview.controls.findChildren(QComboBox)
-        assert [combo.currentIndex() for combo in combos] == [0] * len(combos)
+        assert combos[0].currentText() == "Viewport"
+        assert [combo.currentIndex() for combo in combos[1:]] == [0] * (len(combos) - 1)
         assert preview.controls.findChild(QLineEdit).text() == "#E4DDD2"
         assert not preview.controls.findChild(QCheckBox).isChecked()
         for slider in preview.controls.findChildren(QSlider):
             assert slider.value() * 2 == slider.minimum() + slider.maximum()
         assert preview.controls.snapshot == snapshot
-        assert view.render_engine is RenderEngine.RAY_TRACING
+        assert view.render_engine is RenderEngine.VIEWPORT
         assert view.color_scheme == COLOR_SCHEMES[DEFAULT_COLOR_SCHEME]
         assert view.background == DEFAULT_BACKGROUND
         assert view.shadow == DEFAULT_SHADOW
@@ -191,10 +192,9 @@ def test_copy_cli_captures_the_effective_view(app, monkeypatch, tmp_path):
         # Choose a styled custom background and type an incomplete replacement.
         wait_for(lambda: preview.viewer is not None)
         preview.viewer.ready.emit()
-        engine, palette, background, texture, resolution, ratio = preview.controls.findChildren(
+        _, palette, background, texture, resolution, ratio = preview.controls.findChildren(
             QComboBox
         )
-        engine.setCurrentText("Viewport")
         palette.setCurrentText("Purple")
         background.setCurrentText("Custom")
         hex_color = preview.controls.findChild(QLineEdit)

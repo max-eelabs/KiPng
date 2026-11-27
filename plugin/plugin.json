@@ -1,8 +1,8 @@
 {
   "$schema": "https://go.kicad.org/api/schemas/v1",
-  "identifier": "org.kipng.preview",
+  "identifier": "com.max-eelabs.kipng.preview",
   "name": "KiPng",
-  "description": "Show a 3D preview of the current PCB.",
+  "description": "Quickly export high-quality 3D renders of your PCB with ready-to-use presets on Windows, Linux, and macOS.",
   "runtime": {
     "type": "python"
   },
@@ -10,7 +10,7 @@
     {
       "identifier": "preview",
       "name": "3D Preview",
-      "description": "Open the current board in an interactive 3D view.",
+      "description": "Preview the current PCB in 3D and export a PNG with ready-to-use presets.",
       "scopes": ["pcb"],
       "entrypoint": "preview.py",
       "show-button": true,

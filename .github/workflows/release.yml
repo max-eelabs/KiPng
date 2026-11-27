@@ -1,0 +1,81 @@
+# Copyright (c) 2026 Maxim Pavlov
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: KiPng release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kipng-release-${{ github.ref }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    outputs:
+      artifact-id: ${{ steps.package.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+      - name: Build PCM package
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+              python .github/scripts/build_release.py --tag $env:GITHUB_REF_NAME --repository-url "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY"
+          } else {
+              python .github/scripts/build_release.py
+          }
+          exit $LASTEXITCODE
+      - name: Upload build
+        id: package
+        uses: actions/upload-artifact@v7
+        with:
+          name: KiPng-${{ github.event_name == 'push' && github.ref_name || format('snapshot-{0}', github.sha) }}-${{ github.run_attempt }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: dist
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "$(gh api "repos/$GH_REPO" --jq .visibility)" != public ]]; then
+              echo "The repository must be public so KiCad can download the ZIP." >&2
+              exit 1
+          fi
+          if [[ "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft 2>/dev/null || true)" != false ]]; then
+              gh release create "$GITHUB_REF_NAME" dist/KiPng-*.zip dist/pcm-metadata.json dist/checksums.txt \
+                  --verify-tag --generate-notes --title "KiPng $GITHUB_REF_NAME"
+          fi
+      - name: Verify the public PCM download
+        shell: bash
+        run: |
+          url=$(jq -er '.versions[0].download_url' dist/pcm-metadata.json)
+          mkdir verified
+          curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+              --output "verified/${url##*/}" "$url"
+          (cd verified && sha256sum -c ../dist/checksums.txt)

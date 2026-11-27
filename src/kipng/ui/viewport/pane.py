@@ -14,6 +14,7 @@ from PySide6.QtQuickWidgets import QQuickWidget
 from ...contracts import BOARD_MATERIAL_TAGS, PcbGeometry, ViewportCamera
 from ...contracts.background import DEFAULT_BACKGROUND, WHITE, BackgroundSettings, BackgroundTexture
 from ...contracts.colors import COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, BoardColors
+from ...contracts.options import ENGINE
 from ...contracts.render import (
     DEFAULT_OUTPUT_SIZE,
     DEFAULT_SHADOW,
@@ -45,12 +46,12 @@ class BoardViewport(QQuickWidget):
         self.background = DEFAULT_BACKGROUND
         self.shadow = DEFAULT_SHADOW
         self.output_size = DEFAULT_OUTPUT_SIZE
-        self.render_engine = RenderEngine.RAY_TRACING
+        self.render_engine = RenderEngine(ENGINE.default)
         self.render_frame_visible = False
 
     def reset_settings(self) -> None:
         """Restore the startup render settings and refit the default camera."""
-        self.render_engine = RenderEngine.RAY_TRACING
+        self.render_engine = RenderEngine(ENGINE.default)
         self.set_color_scheme(COLOR_SCHEMES[DEFAULT_COLOR_SCHEME])
         self.set_background(DEFAULT_BACKGROUND)
         self.set_shadow(DEFAULT_SHADOW)
