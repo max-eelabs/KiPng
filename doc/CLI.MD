@@ -23,7 +23,7 @@ KiPng stages a temporary copy beside the saved PCB when possible. For read-only 
 | `BOARD.kicad_pcb` | Required path to the saved PCB. |
 | `-h`, `--help` | Show usage, available options, and defaults, then exit. |
 | `--output-dir PATH` | Save the PNG in this directory and create it if needed. Defaults to the PCB's directory. |
-| `--kicad-cli PATH` | Prefer this KiCad 10.0 executable. KiPng also checks the standard Windows installation, when applicable, and `PATH`. |
+| `--kicad-cli PATH` | Prefer this KiCad 10.0 executable. KiPng also checks the standard Windows or macOS installation, when applicable, and `PATH`. |
 | `--log-level LEVEL` | Set `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` for this run. Overrides `KIPNG_LOG_LEVEL`. The default is `INFO`. |
 
 On success, KiPng prints the full PNG path to stdout. It names the file `BOARD-render-WIDTHxHEIGHT.png`. If that name is already taken, it tries `BOARD-render-2-WIDTHxHEIGHT.png`, then increments the number until a name is available.
@@ -41,7 +41,7 @@ The CLI writes diagnostics to the same rotating log as the preview. See the [log
 
 | Option | Accepted values | Default |
 | --- | --- | --- |
-| `--engine ENGINE` | `ray-tracing` uses KiCad's raytracer. `viewport` uses the Qt Quick 3D scene from the preview. | `ray-tracing` |
+| `--engine ENGINE` | `viewport` uses the Qt Quick 3D scene from the preview. `ray-tracing` uses KiCad's raytracer. | `viewport` |
 | `--color-scheme COLOR` | `green`, `red`, `white`, `black`, `blue`, `purple`, `yellow` | `green` |
 | `--background BACKGROUND` | `white`, `transparent`, `warm-stone`, `mist-blue`, `sage-gray`, `dusty-rose`, `soft-slate`, or six RGB hex digits such as `E4DDD2`. | `white` |
 | `--texture TEXTURE` | `none`, `fabric-grain`, `crinkled-paper` | `none` |

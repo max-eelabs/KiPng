@@ -113,4 +113,6 @@ def test_copied_posix_command_preserves_shell_metacharacters():
     parsed = create_parser().parse_args(args)
     assert parsed.board == board
     assert parsed.camera == camera
+    assert "--engine=viewport" in args
+    assert RenderOptions.from_cli(create_parser().parse_args([str(board)])).engine == "Viewport"
     assert RenderOptions.from_cli(parsed) == settings

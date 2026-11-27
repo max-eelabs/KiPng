@@ -54,3 +54,17 @@ def test_cli_falls_back_from_an_incompatible_executable(monkeypatch, tmp_path):
 
     # Select the compatible CLI after rejecting the editor's candidate.
     assert cli.find_cli(str(custom), Event()) == fallback
+
+
+def test_cli_finds_macos_app_bundle_without_path(monkeypatch, tmp_path):
+    # Simulate the standard macOS installation with no CLI on PATH.
+    executable = tmp_path / "kicad-cli"
+    executable.touch()
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    monkeypatch.setattr(cli, "MACOS_CLI", executable)
+    monkeypatch.delenv("ProgramFiles", raising=False)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli, "run_cli", lambda *_: "10.0.7")
+
+    # KiPng picks the CLI inside the application bundle.
+    assert cli.find_cli(None, Event()) == executable

@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from threading import Event
 from time import monotonic
@@ -15,6 +16,7 @@ from time import monotonic
 from ..contracts import PreviewCancelled, PreviewError
 
 LOGGER = logging.getLogger(__name__)
+MACOS_CLI = Path("/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli")
 
 
 def run_cli(
@@ -65,6 +67,8 @@ def find_cli(preferred: str | None, cancelled: Event) -> Path:
     program_files = os.environ.get("ProgramFiles")
     if program_files:
         candidates.append(str(Path(program_files) / "KiCad/10.0/bin/kicad-cli.exe"))
+    if sys.platform == "darwin":
+        candidates.append(str(MACOS_CLI))
     candidates.append(shutil.which("kicad-cli"))
 
     failures = []

@@ -3,7 +3,9 @@
 
 import json
 import os
+import shutil
 import struct
+from pathlib import Path
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -36,3 +38,18 @@ def write_glb():
         return binary_chunk
 
     return write
+
+
+@pytest.fixture
+def packaging_checkout(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    checkout = tmp_path / "KiPng checkout"
+    checkout.mkdir()
+    for name in ("install.cmd", "install.ps1", "metadata.json", "LICENSE", "VERSION"):
+        shutil.copyfile(root / name, checkout / name)
+    for name in ("plugin", "resources", "src"):
+        shutil.copytree(root / name, checkout / name, ignore=shutil.ignore_patterns("__pycache__"))
+    script = Path(".github/scripts/build_release.py")
+    (checkout / script).parent.mkdir(parents=True)
+    shutil.copyfile(root / script, checkout / script)
+    return checkout

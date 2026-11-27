@@ -1,0 +1,28 @@
+{
+  "$schema": "https://go.kicad.org/pcm/schemas/v2",
+  "identifier": "com.max-eelabs.kipng.preview",
+  "name": "KiPng",
+  "description": "Requires Enable KiCad API in Preferences > Plugins. Quickly export high-quality 3D renders of your PCB with ready-to-use presets.",
+  "description_full": "KiCad API required. In KiCad, open Preferences > Plugins and turn on Enable KiCad API to use KiPng. Then open a board in PCB Editor and click 3D Preview.\n\nPreview your PCB with unsaved edits and export ray-traced or viewport PNGs at up to 4K. Choose from preset solder mask colors, backgrounds, and aspect ratios, then fine-tune the framing and lighting.",
+  "type": "plugin",
+  "author": {
+    "name": "Maxim Pavlov",
+    "contact": {
+      "email": "max.eelabs@gmail.com"
+    }
+  },
+  "license": "GPL-3.0-or-later",
+  "resources": {
+    "Source": "https://github.com/max-eelabs/KiPng",
+    "Issues": "https://github.com/max-eelabs/KiPng/issues"
+  },
+  "versions": [
+    {
+      "version": "0.1.0",
+      "status": "development",
+      "runtime": "ipc",
+      "kicad_version": "10.0",
+      "platforms": ["windows", "linux", "macos"]
+    }
+  ]
+}

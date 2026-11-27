@@ -28,6 +28,17 @@ def plugin_asset(name: str) -> Path:
     return root.parent / "plugin" / name
 
 
+def project_version() -> str:
+    """Read the installed version or the checkout's version file."""
+    root = Path(__file__).resolve().parents[1]
+    if not (root / "plugin.json").is_file():
+        root = root.parent
+    try:
+        return (root / "VERSION").read_text(encoding="ascii").strip() or "unknown"
+    except (OSError, UnicodeError):
+        return "unknown"
+
+
 def create_application() -> QApplication:
     """Set KiPng's Windows taskbar identity and default window icon."""
     if sys.platform == "win32":
@@ -44,7 +55,7 @@ def create_application() -> QApplication:
 
 def main() -> int:
     with configure_logging() as log:
-        LOGGER.info("Starting 3D Preview.")
+        LOGGER.info("Started KiPng %s", project_version())
         try:
             result = run_preview(log)
         except Exception:

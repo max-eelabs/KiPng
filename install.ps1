@@ -3,8 +3,73 @@
  SPDX-License-Identifier: GPL-3.0-or-later
 #>
 
-# Install KiPng into the current user's KiCad 10.0 plugin directory.
+[CmdletBinding()]
+param(
+    [switch]$Local,
+    [string]$OutputPath
+)
+
 $ErrorActionPreference = 'Stop'
+
+function New-PcmArchive($files, [string]$outputPath) {
+    $metadata = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'metadata.json') -Raw -Encoding UTF8
+    $versions = ($metadata | ConvertFrom-Json).versions
+    if (@($versions).Count -ne 1 -or $versions[0].version -notmatch '^[0-9]{1,4}(\.[0-9]{1,4}(\.[0-9]{1,6})?)?\z') {
+        throw 'PCM archive metadata must declare one valid package version.'
+    }
+    $version = $versions[0].version
+    $projectVersion = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'VERSION') -Raw).Trim()
+    $expectedVersion = if ($versions[0].status -eq 'development') { "$version-SNAPSHOT" } else { $version }
+    if ($projectVersion -cne $expectedVersion) {
+        throw "VERSION must be $expectedVersion to match metadata.json."
+    }
+    if (-not $outputPath) {
+        $outputPath = Join-Path $PSScriptRoot "dist\KiPng-$projectVersion.zip"
+    }
+
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($outputPath)
+    if ([IO.Path]::GetExtension($destination) -ne '.zip') {
+        throw 'The PCM output path must end in .zip.'
+    }
+
+    # Build beside the destination so an interrupted build leaves any previous ZIP intact.
+    $directory = Split-Path -Parent $destination
+    [void][IO.Directory]::CreateDirectory($directory)
+    $temporary = Join-Path $directory ([guid]::NewGuid().ToString('N') + '.tmp')
+    try {
+        $archive = [IO.Compression.ZipFile]::Open($temporary, [IO.Compression.ZipArchiveMode]::Create)
+        try {
+            $writer = [IO.StreamWriter]::new($archive.CreateEntry('metadata.json').Open())
+            try {
+                $writer.Write($metadata)
+            } finally {
+                $writer.Dispose()
+            }
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $archive, (Join-Path $PSScriptRoot 'resources\icon.png'), 'resources/icon.png')
+            foreach ($relative in $files.Keys) {
+                $entry = 'plugins/' + $relative.Replace('\', '/')
+                [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                    $archive, $files[$relative], $entry)
+            }
+        } finally {
+            $archive.Dispose()
+        }
+
+        if ([IO.File]::Exists($destination)) {
+            [IO.File]::Replace($temporary, $destination, [NullString]::Value)
+        } else {
+            [IO.File]::Move($temporary, $destination)
+        }
+    } finally {
+        [IO.File]::Delete($temporary)
+    }
+
+    Write-Output "Built KiPng PCM package: $destination"
+    Write-Output 'In the KiCad Project Manager, open Plugin and Content Manager > Install from File and select the ZIP.'
+}
 
 function Get-ContentHash([string]$path) {
     $stream = [IO.File]::OpenRead($path)
@@ -30,6 +95,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $package '__init__.py') -PathType Le
 # Assemble KiCad's install layout from the distribution files and the source package.
 $files = [ordered]@{}
 $files['LICENSE'] = Join-Path $PSScriptRoot 'LICENSE'
+$files['VERSION'] = Join-Path $PSScriptRoot 'VERSION'
+$files['VERSION'] = Join-Path $PSScriptRoot 'VERSION'
 foreach ($name in @('requirements.txt', 'icon-light.png', 'icon-dark.png', 'kipng-logo.svg', 'kipng-logo.ico', 'preview.py', 'render.py', 'plugin.json')) {
     $file = Join-Path $plugin $name
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
@@ -41,6 +108,11 @@ foreach ($file in Get-ChildItem -LiteralPath $package -Recurse -File) {
     if ($file.Extension -in '.py', '.qml') {
         $files[$file.FullName.Substring($source.Length + 1)] = $file.FullName
     }
+}
+
+if (-not $Local) {
+    New-PcmArchive $files $OutputPath
+    return
 }
 
 # Derive parent paths for nested modules so updates reject unsafe destinations.
@@ -76,7 +148,7 @@ if ($updating) {
         throw "The install folder exists without a KiPng manifest: $destination"
     }
     $installedId = (Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json).identifier
-    if ($installedId -ne $expectedId) {
+    if ($installedId -ne $expectedId -and $installedId -ne 'org.kipng.preview') {
         throw "A different plugin occupies the install folder: $destination"
     }
 }
