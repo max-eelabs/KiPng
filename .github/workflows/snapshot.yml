@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       artifact-id: ${{ steps.package.outputs.artifact-id }}
+      package-name: ${{ steps.build.outputs.package-name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -25,12 +26,19 @@ jobs:
         with:
           python-version: '3.10'
       - name: Build PCM snapshot
-        run: python .github/scripts/build_release.py --snapshot
+        id: build
+        shell: pwsh
+        run: |
+          python .github/scripts/build_release.py --snapshot
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $packages = @(Get-ChildItem -Path dist/KiPng-*-SNAPSHOT.zip -File)
+          if ($packages.Count -ne 1) { throw 'Expected one versioned PCM snapshot ZIP.' }
+          "package-name=$($packages[0].Name)" >> $env:GITHUB_OUTPUT
       - name: Upload snapshot ZIP
         id: package
         uses: actions/upload-artifact@v7
         with:
-          path: dist/KiPng-*-SNAPSHOT.zip
+          path: dist/${{ steps.build.outputs.package-name }}
           archive: false
           if-no-files-found: error
 
@@ -48,10 +56,13 @@ jobs:
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}
           path: dist
+          # The uploaded file is already the PCM ZIP.
+          skip-decompress: true
       - name: Publish the latest snapshot ZIP
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          SNAPSHOT_PACKAGE: ${{ needs.build.outputs.package-name }}
         shell: bash
         run: |
           main_sha=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)
@@ -61,13 +72,17 @@ jobs:
           fi
 
           shopt -s nullglob
-          packages=(dist/KiPng-*-SNAPSHOT.zip)
-          if [[ ${#packages[@]} -ne 1 ]]; then
-              echo 'Expected one versioned PCM snapshot ZIP.' >&2
+          downloads=(dist/*)
+          if [[ ${#downloads[@]} -ne 1 || ! -f "${downloads[0]}" ]]; then
+              echo 'Expected one intact PCM snapshot archive from the build job.' >&2
               exit 1
           fi
-          asset=${packages[0]}
-          filename=${asset##*/}
+          filename="$SNAPSHOT_PACKAGE"
+          asset="dist/$filename"
+          if [[ "${downloads[0]}" != "$asset" ]]; then
+              mv -- "${downloads[0]}" "$asset"
+          fi
+          unzip -p "$asset" metadata.json >/dev/null
           version=${filename#KiPng-}
           title="KiPng ${version%.zip}"
           notes="Build from main commit $GITHUB_SHA. Select $filename in KiCad's Plugin and Content Manager using Install from File."
