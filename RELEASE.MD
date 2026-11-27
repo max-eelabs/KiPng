@@ -24,18 +24,25 @@ version and smoke-test results.
 
 ## Build a snapshot
 
-Each push to `main` starts **Build KiPng snapshot**. The successful build of
-the latest commit updates the rolling GitHub prerelease titled
-**KiPng <version>-SNAPSHOT**. Download the `KiPng-<version>-SNAPSHOT.zip` asset
-and select it directly in
+Each push to `main` builds the PCM ZIP and updates the same GitHub Packages
+reference, `ghcr.io/max-eelabs/kipng-snapshot:latest`. The workflow verifies
+the downloaded ZIP and deletes superseded, untagged versions of this package,
+including when the project version changes. Git tags are for stable releases.
+
+Download the current ZIP with [ORAS](https://oras.land/).
+
+```sh
+oras pull ghcr.io/max-eelabs/kipng-snapshot:latest
+```
+
+Select the resulting `KiPng-<version>-SNAPSHOT.zip` directly in
 **Plugin and Content Manager → Install from File** on Windows, Linux, or macOS.
-[Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/snapshot)
+After the first publication, set the package visibility to **Public** in
+GitHub package settings to enable anonymous downloads.
 
 To rebuild manually, open **Actions → Build KiPng snapshot → Run workflow**.
-Choose `main` to refresh the public ZIP or select a feature branch to get
-its install-ready ZIP from that run's **Artifacts**. The `snapshot` tag
-tracks the commit packaged by the rolling release. Once GitHub serves the
-new ZIP, the workflow removes older snapshot ZIPs from that prerelease.
+Choose `main` to refresh the package. Feature branch runs provide their
+install-ready ZIP under **Artifacts** for testing.
 
 On Windows, run `.\install.cmd` from the checkout root to build a local
 snapshot in `dist/`. The Windows runner uses the same packager to assemble
