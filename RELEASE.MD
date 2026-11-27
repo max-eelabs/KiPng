@@ -24,8 +24,9 @@ version and smoke-test results.
 
 ## Build a snapshot
 
-Run **KiPng release** from the **Actions** tab on a branch with development
-metadata. Open the completed run and download the `KiPng-snapshot-…`
+Open **Actions → Build KiPng snapshot** and click **Run workflow**. Choose
+`main` for the latest merged snapshot or select another branch with
+development metadata. Open the completed run and download the `KiPng-snapshot-…`
 artifact. Extract its inner `KiPng-<version>-SNAPSHOT.zip` and use **Plugin and Content
 Manager → Install from File** in KiCad 10.0 on Windows, Linux, or macOS.
 Snapshot builds are distributed as Actions artifacts.

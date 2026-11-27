@@ -14,18 +14,13 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 > [KiCad 10.0 plugin preferences](https://docs.kicad.org/10.0/en/kicad/kicad.html#plugins-preferences)
 
 1. Install KiCad 10.0 with its command-line tools and configure a 64-bit Python 3.10–3.13 interpreter in **Preferences → Plugins**. KiCad installs the dependencies listed in the plugin's `requirements.txt`.
-2. Get the versioned ZIP from [GitHub Releases](https://github.com/max-eelabs/KiPng/releases). To build it from a checkout on Windows, run the packaging command from the workspace root.
+2. Download a KiPng build. Each ZIP supports Windows, Linux, and macOS.
 
-   ```powershell
-   .\install.cmd
-   ```
+   - **Stable release**. Download `KiPng-<version>.zip` from the release assets. [GitHub Releases](https://github.com/max-eelabs/KiPng/releases)
+   - **Development snapshot**. Open a successful **Build KiPng snapshot** run, download its artifact, and extract the inner `KiPng-<version>-SNAPSHOT.zip`. [GitHub Actions](https://github.com/max-eelabs/KiPng/actions/workflows/snapshot.yml)
 
-3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the ZIP. Local builds place it in `dist/`, for example `KiPng-0.1.0-SNAPSHOT.zip`. KiPng appears under **Installed**.
+3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the KiPng ZIP. KiPng appears under **Installed**.
 4. Restart KiCad and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
-
-If you previously installed a ZIP with the `org.kipng.preview` identifier, uninstall that entry in PCM before installing the current ZIP. If you previously installed with the copy-based script, close KiCad after installing the ZIP and move the old `kipng` folder out of the KiCad 10.0 user `plugins/` directory before restarting. This prevents both copies from registering the same action.
-
-For direct development installs on Windows, use `.\install.cmd -Local`. It copies or updates the files in the user plugin directory and respects `KICAD_DOCUMENTS_HOME`. Use one installation mode at a time.
 
 The plugin looks for the CLI in the running editor's installation, the standard Windows or macOS installation when applicable, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
 
@@ -92,6 +87,11 @@ Both installation modes place the `kipng` runtime package beside `plugin.json`. 
 ## Development and testing
 
 See the [release guide](RELEASE.MD) for snapshot builds, tagged releases, and KiCad PCM submission.
+
+From a Windows checkout, run `.\install.cmd` to build a PCM ZIP in `dist/`.
+For direct development installs, run `.\install.cmd -Local`. It updates the
+user plugin directory and respects `KICAD_DOCUMENTS_HOME`. Use one
+installation mode at a time.
 
 From the repository root, in an activated virtual environment, run:
 
