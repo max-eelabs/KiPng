@@ -4,6 +4,8 @@
 name: Build KiPng snapshot
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,6 +15,8 @@ jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 10
+    outputs:
+      artifact-id: ${{ steps.package.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -21,10 +25,81 @@ jobs:
         with:
           python-version: '3.10'
       - name: Build PCM snapshot
-        run: python .github/scripts/build_release.py
+        run: python .github/scripts/build_release.py --snapshot
       - name: Upload snapshot ZIP
+        id: package
         uses: actions/upload-artifact@v7
         with:
-          name: KiPng-snapshot-${{ github.sha }}-${{ github.run_attempt }}
           path: dist/KiPng-*-SNAPSHOT.zip
+          archive: false
           if-no-files-found: error
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: kipng-publish-snapshot
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: dist
+      - name: Publish the latest snapshot ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          main_sha=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)
+          if [[ "$main_sha" != "$GITHUB_SHA" ]]; then
+              echo 'A newer commit is on main. Its build will publish the snapshot.'
+              exit 0
+          fi
+
+          shopt -s nullglob
+          packages=(dist/KiPng-*-SNAPSHOT.zip)
+          if [[ ${#packages[@]} -ne 1 ]]; then
+              echo 'Expected one versioned PCM snapshot ZIP.' >&2
+              exit 1
+          fi
+          asset=${packages[0]}
+          filename=${asset##*/}
+          version=${filename#KiPng-}
+          title="KiPng ${version%.zip}"
+          notes="Build from main commit $GITHUB_SHA. Select $filename in KiCad's Plugin and Content Manager using Install from File."
+          if prerelease=$(gh release view snapshot --json isPrerelease --jq .isPrerelease); then
+              if [[ "$prerelease" != true ]]; then
+                  echo 'The snapshot tag already belongs to a stable release.' >&2
+                  exit 1
+              fi
+              gh release upload snapshot "$asset" --clobber
+              gh release edit snapshot --title "$title" --notes "$notes" --prerelease --latest=false --draft=false
+          else
+              gh release create snapshot "$asset" --target "$GITHUB_SHA" \
+                  --title "$title" --notes "$notes" --prerelease --latest=false
+          fi
+
+          url="$GITHUB_SERVER_URL/$GH_REPO/releases/download/snapshot/$filename"
+          curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+              --output "$RUNNER_TEMP/$filename" "$url"
+          cmp "$asset" "$RUNNER_TEMP/$filename"
+
+          snapshot_sha=$(gh api "repos/$GH_REPO/git/ref/tags/snapshot" --jq .object.sha)
+          if [[ "$snapshot_sha" != "$GITHUB_SHA" ]]; then
+              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/snapshot" \
+                  -f sha="$GITHUB_SHA" -F force=true --silent
+          fi
+
+          assets=$(gh release view snapshot --json assets --jq '.assets[].name')
+          while IFS= read -r previous; do
+              if [[ "$previous" == "$filename" ]]; then
+                  continue
+              fi
+              if [[ "$previous" == KiPng-SNAPSHOT.zip || "$previous" =~ ^KiPng-[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT\.zip$ ]]; then
+                  gh release delete-asset snapshot "$previous" --yes
+              fi
+          done <<< "$assets"

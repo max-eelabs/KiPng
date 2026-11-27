@@ -16,10 +16,10 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 1. Install KiCad 10.0 with its command-line tools and configure a 64-bit Python 3.10–3.13 interpreter in **Preferences → Plugins**. KiCad installs the dependencies listed in the plugin's `requirements.txt`.
 2. Download a KiPng build. Each ZIP supports Windows, Linux, and macOS.
 
-   - **Stable release**. Download `KiPng-<version>.zip` from the release assets. [GitHub Releases](https://github.com/max-eelabs/KiPng/releases)
-   - **Development snapshot**. Open a successful **Build KiPng snapshot** run, download its artifact, and extract the inner `KiPng-<version>-SNAPSHOT.zip`. [GitHub Actions](https://github.com/max-eelabs/KiPng/actions/workflows/snapshot.yml)
+   - **Stable release**. Choose the `KiPng-<version>.zip` asset. [Latest stable release](https://github.com/max-eelabs/KiPng/releases/latest)
+   - **Development snapshot**. Choose the `KiPng-<version>-SNAPSHOT.zip` asset. GitHub refreshes it after each push to `main`. [Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/snapshot)
 
-3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the KiPng ZIP. KiPng appears under **Installed**.
+3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the downloaded ZIP directly. KiPng appears under **Installed**.
 4. Restart KiCad and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
 
 The plugin looks for the CLI in the running editor's installation, the standard Windows or macOS installation when applicable, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.

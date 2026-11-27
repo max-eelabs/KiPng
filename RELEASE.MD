@@ -24,12 +24,18 @@ version and smoke-test results.
 
 ## Build a snapshot
 
-Open **Actions → Build KiPng snapshot** and click **Run workflow**. Choose
-`main` for the latest merged snapshot or select another branch with
-development metadata. Open the completed run and download the `KiPng-snapshot-…`
-artifact. Extract its inner `KiPng-<version>-SNAPSHOT.zip` and use **Plugin and Content
-Manager → Install from File** in KiCad 10.0 on Windows, Linux, or macOS.
-Snapshot builds are distributed as Actions artifacts.
+Each push to `main` starts **Build KiPng snapshot**. The successful build of
+the latest commit updates the rolling GitHub prerelease titled
+**KiPng <version>-SNAPSHOT**. Download the `KiPng-<version>-SNAPSHOT.zip` asset
+and select it directly in
+**Plugin and Content Manager → Install from File** on Windows, Linux, or macOS.
+[Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/snapshot)
+
+To rebuild manually, open **Actions → Build KiPng snapshot → Run workflow**.
+Choose `main` to refresh the public ZIP or select a feature branch to get
+its install-ready ZIP from that run's **Artifacts**. The `snapshot` tag
+tracks the commit packaged by the rolling release. Once GitHub serves the
+new ZIP, the workflow removes older snapshot ZIPs from that prerelease.
 
 On Windows, run `.\install.cmd` from the checkout root to build a local
 snapshot in `dist/`. The Windows runner uses the same packager to assemble
@@ -92,6 +98,7 @@ KiCad may ask for confirmation that the maintainer controls the domain.
    Release, attaches the assets, and publishes it. Wait for the workflow to
    pass before submitting to PCM. The [GitHub release](https://github.com/max-eelabs/KiPng/releases)
    contains `KiPng-<version>.zip`, `checksums.txt`, and `pcm-metadata.json`.
+   Select the versioned ZIP asset directly in PCM's **Install from File** dialog.
    The workflow verifies the ZIP's SHA-256 by downloading it from the public
    URL recorded in `pcm-metadata.json`. The URL has this form.
 

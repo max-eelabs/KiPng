@@ -6,6 +6,7 @@
 [CmdletBinding()]
 param(
     [switch]$Local,
+    [switch]$Snapshot,
     [string]$OutputPath
 )
 
@@ -13,7 +14,8 @@ $ErrorActionPreference = 'Stop'
 
 function New-PcmArchive($files, [string]$outputPath) {
     $metadata = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'metadata.json') -Raw -Encoding UTF8
-    $versions = ($metadata | ConvertFrom-Json).versions
+    $packageMetadata = $metadata | ConvertFrom-Json
+    $versions = $packageMetadata.versions
     if (@($versions).Count -ne 1 -or $versions[0].version -notmatch '^[0-9]{1,4}(\.[0-9]{1,4}(\.[0-9]{1,6})?)?\z') {
         throw 'PCM archive metadata must declare one valid package version.'
     }
@@ -22,6 +24,13 @@ function New-PcmArchive($files, [string]$outputPath) {
     $expectedVersion = if ($versions[0].status -eq 'development') { "$version-SNAPSHOT" } else { $version }
     if ($projectVersion -cne $expectedVersion) {
         throw "VERSION must be $expectedVersion to match metadata.json."
+    }
+    # A snapshot of a release-preparation commit keeps the development status.
+    $convertToSnapshot = $Snapshot -and $versions[0].status -eq 'stable'
+    if ($convertToSnapshot) {
+        $versions[0].status = 'development'
+        $metadata = $packageMetadata | ConvertTo-Json -Depth 10
+        $projectVersion = "$version-SNAPSHOT"
     }
     if (-not $outputPath) {
         $outputPath = Join-Path $PSScriptRoot "dist\KiPng-$projectVersion.zip"
@@ -41,16 +50,15 @@ function New-PcmArchive($files, [string]$outputPath) {
     try {
         $archive = [IO.Compression.ZipFile]::Open($temporary, [IO.Compression.ZipArchiveMode]::Create)
         try {
-            $writer = [IO.StreamWriter]::new($archive.CreateEntry('metadata.json').Open())
-            try {
-                $writer.Write($metadata)
-            } finally {
-                $writer.Dispose()
-            }
+            Write-ArchiveText $archive 'metadata.json' $metadata
             [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
                 $archive, (Join-Path $PSScriptRoot 'resources\icon.png'), 'resources/icon.png')
             foreach ($relative in $files.Keys) {
                 $entry = 'plugins/' + $relative.Replace('\', '/')
+                if ($convertToSnapshot -and $relative -eq 'VERSION') {
+                    Write-ArchiveText $archive $entry ($projectVersion + "`n")
+                    continue
+                }
                 [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
                     $archive, $files[$relative], $entry)
             }
@@ -69,6 +77,15 @@ function New-PcmArchive($files, [string]$outputPath) {
 
     Write-Output "Built KiPng PCM package: $destination"
     Write-Output 'In the KiCad Project Manager, open Plugin and Content Manager > Install from File and select the ZIP.'
+}
+
+function Write-ArchiveText($archive, [string]$entry, [string]$content) {
+    $writer = [IO.StreamWriter]::new($archive.CreateEntry($entry).Open())
+    try {
+        $writer.Write($content)
+    } finally {
+        $writer.Dispose()
+    }
 }
 
 function Get-ContentHash([string]$path) {
