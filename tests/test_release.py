@@ -67,3 +67,37 @@ def test_release_metadata_matches_the_downloadable_zip(packaging_checkout):
         "install_size": install_size,
     }
     assert (dist / "checksums.txt").read_text(encoding="ascii") == f"{digest}  {package.name}\n"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="The release builder targets Windows.")
+def test_snapshot_from_stable_metadata_is_an_installable_development_zip(packaging_checkout):
+    # Simulate the release-preparation commit that just merged into main.
+    metadata_path = packaging_checkout / "metadata.json"
+    version_path = packaging_checkout / "VERSION"
+    metadata = json.loads(metadata_path.read_bytes())
+    (entry,) = metadata["versions"]
+    entry.update(version="1.2.3", status="stable")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    version_path.write_text("1.2.3\n", encoding="ascii")
+
+    # The snapshot build produces a single PCM ZIP.
+    result = subprocess.run(
+        [sys.executable, ".github/scripts/build_release.py", "--snapshot"],
+        cwd=packaging_checkout,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    (package,) = (packaging_checkout / "dist").iterdir()
+    assert package.name == "KiPng-1.2.3-SNAPSHOT.zip"
+
+    # PCM and the plugin see a snapshot version while the checkout remains stable.
+    with ZipFile(package) as archive:
+        packaged_metadata = json.loads(archive.read("metadata.json"))
+        assert packaged_metadata["versions"] == [{**entry, "status": "development"}]
+        assert archive.read("plugins/VERSION") == b"1.2.3-SNAPSHOT\n"
+        assert "plugins/plugin.json" in archive.namelist()
+    assert json.loads(metadata_path.read_bytes()) == metadata
+    assert version_path.read_text(encoding="ascii") == "1.2.3\n"
