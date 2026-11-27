@@ -17,7 +17,7 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 2. Download a KiPng build. Each ZIP supports Windows, Linux, and macOS.
 
    - **Stable release**. Choose the `KiPng-<version>.zip` asset. [Latest stable release](https://github.com/max-eelabs/KiPng/releases/latest)
-   - **Development snapshot**. GitHub refreshes this ZIP after each push to `main`. [Download KiPng-SNAPSHOT.zip](https://github.com/max-eelabs/KiPng/releases/download/snapshot/KiPng-SNAPSHOT.zip)
+   - **Development snapshot**. Choose the `KiPng-<version>-SNAPSHOT.zip` asset. GitHub refreshes it after each push to `main`. [Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/snapshot)
 
 3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the downloaded ZIP directly. KiPng appears under **Installed**.
 4. Restart KiCad and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.

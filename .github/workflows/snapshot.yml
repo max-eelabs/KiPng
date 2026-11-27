@@ -25,18 +25,12 @@ jobs:
         with:
           python-version: '3.10'
       - name: Build PCM snapshot
-        shell: pwsh
-        run: |
-          python .github/scripts/build_release.py --snapshot
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          $packages = @(Get-ChildItem -Path dist/KiPng-*-SNAPSHOT.zip -File)
-          if ($packages.Count -ne 1) { throw 'Expected one PCM snapshot ZIP.' }
-          Move-Item -LiteralPath $packages[0].FullName -Destination dist/KiPng-SNAPSHOT.zip
+        run: python .github/scripts/build_release.py --snapshot
       - name: Upload snapshot ZIP
         id: package
         uses: actions/upload-artifact@v7
         with:
-          path: dist/KiPng-SNAPSHOT.zip
+          path: dist/KiPng-*-SNAPSHOT.zip
           archive: false
           if-no-files-found: error
 
@@ -66,16 +60,22 @@ jobs:
               exit 0
           fi
 
-          asset=dist/KiPng-SNAPSHOT.zip
-          title='KiPng development snapshot'
-          notes="Build from main commit $GITHUB_SHA. Select KiPng-SNAPSHOT.zip in KiCad's Plugin and Content Manager using Install from File."
+          shopt -s nullglob
+          packages=(dist/KiPng-*-SNAPSHOT.zip)
+          if [[ ${#packages[@]} -ne 1 ]]; then
+              echo 'Expected one versioned PCM snapshot ZIP.' >&2
+              exit 1
+          fi
+          asset=${packages[0]}
+          filename=${asset##*/}
+          version=${filename#KiPng-}
+          title="KiPng ${version%.zip}"
+          notes="Build from main commit $GITHUB_SHA. Select $filename in KiCad's Plugin and Content Manager using Install from File."
           if prerelease=$(gh release view snapshot --json isPrerelease --jq .isPrerelease); then
               if [[ "$prerelease" != true ]]; then
                   echo 'The snapshot tag already belongs to a stable release.' >&2
                   exit 1
               fi
-              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/snapshot" \
-                  -f sha="$GITHUB_SHA" -F force=true --silent
               gh release upload snapshot "$asset" --clobber
               gh release edit snapshot --title "$title" --notes "$notes" --prerelease --latest=false --draft=false
           else
@@ -83,7 +83,23 @@ jobs:
                   --title "$title" --notes "$notes" --prerelease --latest=false
           fi
 
-          url="$GITHUB_SERVER_URL/$GH_REPO/releases/download/snapshot/KiPng-SNAPSHOT.zip"
+          url="$GITHUB_SERVER_URL/$GH_REPO/releases/download/snapshot/$filename"
           curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
-              --output "$RUNNER_TEMP/KiPng-SNAPSHOT.zip" "$url"
-          cmp "$asset" "$RUNNER_TEMP/KiPng-SNAPSHOT.zip"
+              --output "$RUNNER_TEMP/$filename" "$url"
+          cmp "$asset" "$RUNNER_TEMP/$filename"
+
+          snapshot_sha=$(gh api "repos/$GH_REPO/git/ref/tags/snapshot" --jq .object.sha)
+          if [[ "$snapshot_sha" != "$GITHUB_SHA" ]]; then
+              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/snapshot" \
+                  -f sha="$GITHUB_SHA" -F force=true --silent
+          fi
+
+          assets=$(gh release view snapshot --json assets --jq '.assets[].name')
+          while IFS= read -r previous; do
+              if [[ "$previous" == "$filename" ]]; then
+                  continue
+              fi
+              if [[ "$previous" == KiPng-SNAPSHOT.zip || "$previous" =~ ^KiPng-[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT\.zip$ ]]; then
+                  gh release delete-asset snapshot "$previous" --yes
+              fi
+          done <<< "$assets"

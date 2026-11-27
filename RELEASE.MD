@@ -25,15 +25,17 @@ version and smoke-test results.
 ## Build a snapshot
 
 Each push to `main` starts **Build KiPng snapshot**. The successful build of
-the latest commit updates the rolling GitHub prerelease named
-**KiPng development snapshot**. Select the downloaded ZIP directly in
+the latest commit updates the rolling GitHub prerelease titled
+**KiPng <version>-SNAPSHOT**. Download the `KiPng-<version>-SNAPSHOT.zip` asset
+and select it directly in
 **Plugin and Content Manager → Install from File** on Windows, Linux, or macOS.
-[Download KiPng-SNAPSHOT.zip](https://github.com/max-eelabs/KiPng/releases/download/snapshot/KiPng-SNAPSHOT.zip)
+[Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/snapshot)
 
 To rebuild manually, open **Actions → Build KiPng snapshot → Run workflow**.
 Choose `main` to refresh the public ZIP or select a feature branch to get
 its install-ready ZIP from that run's **Artifacts**. The `snapshot` tag
-tracks the commit packaged by the rolling release.
+tracks the commit packaged by the rolling release. Once GitHub serves the
+new ZIP, the workflow removes older snapshot ZIPs from that prerelease.
 
 On Windows, run `.\install.cmd` from the checkout root to build a local
 snapshot in `dist/`. The Windows runner uses the same packager to assemble
