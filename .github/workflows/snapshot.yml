@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: kipng-snapshot-${{ github.ref }}
+
 jobs:
   build:
     runs-on: windows-latest
@@ -47,10 +50,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    concurrency:
-      group: kipng-publish-snapshot
     permissions:
-      contents: write
+      contents: read
+      packages: write
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -58,6 +60,9 @@ jobs:
           path: dist
           # The uploaded file is already the PCM ZIP.
           skip-decompress: true
+      - uses: oras-project/setup-oras@22ce207df3b08e061f537244349aac6ae1d214f6 # v1.2.4
+        with:
+          version: 1.3.0
       - name: Publish the latest snapshot ZIP
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,38 +88,25 @@ jobs:
               mv -- "${downloads[0]}" "$asset"
           fi
           unzip -p "$asset" metadata.json >/dev/null
-          version=${filename#KiPng-}
-          title="KiPng ${version%.zip}"
-          notes="Build from main commit $GITHUB_SHA. Select $filename in KiCad's Plugin and Content Manager using Install from File."
-          if prerelease=$(gh release view snapshot --json isPrerelease --jq .isPrerelease); then
-              if [[ "$prerelease" != true ]]; then
-                  echo 'The snapshot tag already belongs to a stable release.' >&2
-                  exit 1
-              fi
-              gh release upload snapshot "$asset" --clobber
-              gh release edit snapshot --title "$title" --notes "$notes" --prerelease --latest=false --draft=false
-          else
-              gh release create snapshot "$asset" --target "$GITHUB_SHA" \
-                  --title "$title" --notes "$notes" --prerelease --latest=false
-          fi
+          package=kipng-snapshot
+          ref="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$package:latest"
+          printf '%s' "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          cd dist
+          oras push "$ref" --annotation "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GH_REPO" \
+              --annotation "org.opencontainers.image.revision=$GITHUB_SHA" "$filename:application/zip"
+          digest=$(oras resolve "$ref")
+          oras pull "$ref" -o "$RUNNER_TEMP/published"
+          cmp "$filename" "$RUNNER_TEMP/published/$filename"
 
-          url="$GITHUB_SERVER_URL/$GH_REPO/releases/download/snapshot/$filename"
-          curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
-              --output "$RUNNER_TEMP/$filename" "$url"
-          cmp "$asset" "$RUNNER_TEMP/$filename"
-
-          snapshot_sha=$(gh api "repos/$GH_REPO/git/ref/tags/snapshot" --jq .object.sha)
-          if [[ "$snapshot_sha" != "$GITHUB_SHA" ]]; then
-              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/snapshot" \
-                  -f sha="$GITHUB_SHA" -F force=true --silent
-          fi
-
-          assets=$(gh release view snapshot --json assets --jq '.assets[].name')
-          while IFS= read -r previous; do
-              if [[ "$previous" == "$filename" ]]; then
-                  continue
+          # Moving latest leaves the previous manifest untagged, including across version bumps.
+          endpoint="users/$GITHUB_REPOSITORY_OWNER/packages/container/$package/versions"
+          versions=$(gh api --paginate --slurp "$endpoint?per_page=100")
+          jq -e --arg digest "$digest" 'add | any(.name == $digest and
+              (.metadata.container.tags | index("latest") != null))' <<< "$versions" >/dev/null
+          previous=$(jq -r --arg digest "$digest" 'add[] | select(.name != $digest and
+              (.metadata.container.tags | length == 0)) | .id' <<< "$versions")
+          while read -r id; do
+              if [[ -n "$id" ]]; then
+                  gh api --method DELETE "$endpoint/$id"
               fi
-              if [[ "$previous" == KiPng-SNAPSHOT.zip || "$previous" =~ ^KiPng-[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT\.zip$ ]]; then
-                  gh release delete-asset snapshot "$previous" --yes
-              fi
-          done <<< "$assets"
+          done <<< "$previous"
