@@ -43,3 +43,10 @@ jobs:
       - name: Check CLI entrypoint
         run: python plugin/render.py --help
       - run: python -m pytest
+
+  snapshot:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    permissions:
+      contents: write
+    uses: ./.github/workflows/snapshot.yml
