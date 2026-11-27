@@ -86,10 +86,11 @@ def test_source_files_stay_within_250_lines():
 
 @pytest.mark.skipif(sys.platform != "win32", reason="The installer targets Windows.")
 def test_default_install_builds_pcm_archive(tmp_path, packaging_checkout):
-    # Set a version distinct from the source metadata's current version.
+    # Set a development version distinct from the source metadata's current version.
     checkout = packaging_checkout
     metadata = json.loads((checkout / "metadata.json").read_bytes())
     metadata["versions"][0]["version"] = "2.3.456"
+    metadata["versions"][0]["status"] = "development"
     (checkout / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     (checkout / "VERSION").write_text("2.3.456-SNAPSHOT\n", encoding="ascii")
 
