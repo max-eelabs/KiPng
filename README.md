@@ -2,9 +2,42 @@
 
 <img src="plugin/kipng-logo.svg" alt="KiPng Kp logo" width="80" height="80">
 
-KiPng adds a **3D Preview** button to the KiCad PCB Editor toolbar. It opens an interactive view of the current board, including unsaved edits, against a white background. Drag to orbit all the way around the board and inspect either side, hold Ctrl and drag to pan, and scroll to zoom. Choose **File > Reload Board** to pick up the latest edits without closing the preview. The File menu also lets you render, restore the default camera and render settings, or exit.
+**High-quality PCB renders, straight from KiCad.** KiPng adds one-click PNG export from an interactive 3D preview of your board. Quickly pick a solder-mask color and framing preset, then click **Render**. Make a close-up for a project page, a transparent background image for a datasheet, or a 4K render for a presentation.
 
-In the **Render** section, use **Color Scheme** to preview green, red, white, black, blue, purple, or yellow solder mask. The palette updates both board faces while keeping the current camera. The exported PNG uses the selected palette.
+<table>
+  <tr>
+    <td width="33%"><img src="media/pic-n-usb-red-1440x1080.png" alt="PICnUSB with a red solder mask"></td>
+    <td width="33%"><img src="media/psu-ext-black-1440x1080.png" alt="PSU-EXT with a black solder mask"></td>
+    <td width="33%"><img src="media/psu-usb-c-white-1440x1080.png" alt="PSU-USB-C with a white solder mask"></td>
+  </tr>
+  <tr>
+    <td>PICnUSB · Red</td>
+    <td>PSU-EXT · Black</td>
+    <td>PSU-USB-C · White</td>
+  </tr>
+</table>
+
+## What you can do
+
+- Preview either side of your board, including unsaved edits. Orbit, pan, zoom, and reload the board from the preview.
+- Try seven solder-mask colors and choose a preset background color, enter a custom hex color, or export with a transparent background.
+- Add **Fabric Grain** or **Crinkled Paper** to colored backgrounds.
+- Move the shadow with **Light X** and **Light Y**, then adjust **Shadow** to fade it out or sharpen it.
+- Export FHD or 4K PNGs in landscape, portrait, or square. Use the render frame to compose the whole board or crop in on a detail.
+- Choose **Viewport** to export the preview’s look or **Ray Tracing** for KiCad’s raytraced lighting.
+- Use **File → Copy CLI** to reproduce the shot from a saved board in a terminal.
+
+![KiPng’s 3D Preview showing PICnUSB in red alongside the render controls](media/pic-n-usb-preview.png)
+
+## Render a board as part of CI
+
+Generate a fresh board image on every build and upload the `renders/` folder as a CI artifact. With KiCad 10.0 and the Python dependencies installed on the runner, run this from the KiPng checkout. Replace `board.kicad_pcb` with the path to your saved board.
+
+```sh
+python plugin/render.py board.kicad_pcb --engine ray-tracing --camera=-65,-26,1.4,0,0,1,0.98 --aspect-ratio 4:3 --resolution fhd --output-dir renders
+```
+
+Ray tracing with an explicit camera runs headless. Use **File → Copy CLI** in the preview to capture your own framing and render settings. [CLI setup and options](doc/CLI.MD)
 
 ## Install on Windows, Linux, or macOS
 
@@ -17,14 +50,14 @@ In the **Render** section, use **Color Scheme** to preview green, red, white, bl
 2. Download a KiPng build. Each ZIP supports Windows, Linux, and macOS.
 
    - **Stable release**. Choose the `KiPng-<version>.zip` asset. [Latest stable release](https://github.com/max-eelabs/KiPng/releases/latest)
-   - **Development snapshot**. Choose the `KiPng-<version>-SNAPSHOT.zip` asset. GitHub refreshes it after each push to `main`. [Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/current-snapshot)
+   - **Development snapshot**. Choose the `KiPng-<version>-SNAPSHOT.zip` asset. GitHub refreshes it after the checks pass and the snapshot builds on `main`. [Latest development snapshot](https://github.com/max-eelabs/KiPng/releases/tag/current-snapshot)
 
 3. In KiCad Project Manager, open **Plugin and Content Manager**, choose **Install from File**, and select the downloaded ZIP directly. KiPng appears under **Installed**.
 4. Restart KiCad and open a PCB. Click **3D Preview** on the PCB Editor toolbar once KiCad finishes setting up the plugin environment. If you use a custom toolbar, add the action in the PCB Editor's toolbar preferences.
 
-The plugin looks for the CLI in the running editor's installation, the standard Windows or macOS installation when applicable, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
+## Frame and export a render
 
-When the GLB includes a VRML footprint model, KiPng can recover source transparency for the live preview and Viewport PNGs. This works when the footprint has one readable VRML model and each affected GLB material color identifies a single opacity in that model.
+Drag to orbit, hold Ctrl and drag to pan, and scroll to zoom. Choose **File → Reload Board** to pick up your latest edits without closing the preview.
 
 In **Render**, choose **Viewport** for the Qt 3D preview's appearance or **Ray Tracing** for KiCad's raytraced lighting. Both engines use the selected color scheme, camera, aspect ratio, and resolution to produce one PNG. The default is Viewport at FHD in 9:16 (1080 × 1920). You can also choose 3:4, 16:9, 4:3, or 1:1. 4K doubles both pixel dimensions for the selected ratio.
 
@@ -33,16 +66,6 @@ Choose **Background** to change the backdrop in the preview and exported PNG. Us
 Drag **Light X** and **Light Y** to move the shadow. All three sliders start centered. Drag **Shadow** left to fade it out or right to sharpen it. The controls apply to the live preview and both PNG engines.
 
 In the **Viewport** section, turn on **Show Render Frame** to see gray corner marks and a circled crosshair for the PNG crop. Frame the part of the board you want to show, then click **Render** and choose a folder. Both engines crop the PNG to the frame, so the board can extend past the edges. The PNG uses the current camera angle, zoom, pan, and background with a soft shadow.
-
-## Render from the command line
-
-Use the CLI to export a PNG from a saved PCB without opening the editor. With KiCad 10.0 and the Python dependencies installed, run this from the source checkout.
-
-```text
-python plugin/render.py board.kicad_pcb --output-dir renders
-```
-
-Choose **File > Copy CLI** in the preview to reproduce its current framing and render settings. See the [CLI reference](doc/CLI.MD) for installation paths, options, defaults, and examples.
 
 ## Logging
 
@@ -60,6 +83,10 @@ $env:KIPNG_LOG_LEVEL = 'DEBUG'
 If an existing plugin environment is missing the logging dependency after an upgrade, right-click the **3D Preview** action in the PCB Editor's plugin preferences and select **Recreate Plugin Environment**. [KiCad IPC plugin debugging](https://dev-docs.kicad.org/en/apis-and-binding/ipc-api/for-addon-developers/#debugging)
 
 ## Project structure
+
+The plugin looks for the CLI in the running editor's installation, the standard Windows or macOS installation when applicable, and then `PATH`. It exports a temporary GLB for the interactive view using the default assembly variant. KiPng stages a snapshot beside the board when possible. For read-only projects, it stages the snapshot in a temporary folder and resolves relative footprint model paths from the original project.
+
+When the GLB includes a VRML footprint model, KiPng can recover source transparency for the live preview and Viewport PNGs. This works when the footprint has one readable VRML model and each affected GLB material color identifies a single opacity in that model.
 
 | Path | Purpose |
 | --- | --- |
@@ -85,6 +112,8 @@ Both installation modes place the `kipng` runtime package beside `plugin.json`. 
 - Define image-affecting settings in `src/kipng/contracts/options.py` so the controls, CLI, and copied command use the same option definitions.
 
 ## Development and testing
+
+See the [contribution guide](CONTRIBUTING.md) for required DCO sign-off and cryptographic signatures, feature branches, and pull requests.
 
 See the [release guide](RELEASE.MD) for snapshot builds, tagged releases, and KiCad PCM submission.
 
